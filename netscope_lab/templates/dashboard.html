@@ -5,6 +5,28 @@
 
 {% block content %}
 {% if has_data %}
+
+{% if posture is defined and posture %}
+<div class="posture-banner mb-4">
+    <div class="posture-score-box">
+        <div class="posture-grade-badge grade-{{ posture.grade|lower|replace('+', '-plus') }}">{{ posture.grade }}</div>
+        <div class="posture-score-number">{{ posture.score }} <span class="score-max">/ 100</span></div>
+    </div>
+    <div class="posture-details">
+        <div class="d-flex justify-between align-center">
+            <h2>{{ posture.level }}</h2>
+            <div class="posture-quick-links">
+                <a href="{{ url_for('topology_view') }}" class="btn btn-outline btn-sm">🌐 Network Topology</a>
+                <a href="{{ url_for('threat_intel_view') }}" class="btn btn-primary btn-sm">🛡️ Threat & CVEs ({{ findings|length }})</a>
+            </div>
+        </div>
+        <p class="text-muted text-sm mt-1">
+            Overall risk evaluation based on open services, cleartext exposures, and threat intelligence.
+        </p>
+    </div>
+</div>
+{% endif %}
+
 <div class="stats-grid">
     <div class="stat-card stat-primary" id="stat-hosts">
         <div class="stat-icon">🖥️</div>
@@ -136,10 +158,10 @@
     <h2>No Scan Data Loaded</h2>
     <p>Start an authorized Nmap scan to discover hosts, open ports, and services. Results will appear here automatically.</p>
     <div class="empty-actions">
-        <a href="{{ url_for('live_scan') }}" class="btn btn-primary" id="btn-start-scan">Start a Live Scan</a>
+        <a href="{{ url_for('fast_scan_view') }}" class="btn btn-primary" id="btn-fast-scan">⚡ Fast Socket Scan (No Root)</a>
+        <a href="{{ url_for('live_scan') }}" class="btn btn-outline" id="btn-start-scan">🎯 Nmap Live Scan</a>
         <a href="{{ url_for('upload') }}" class="btn btn-secondary" id="btn-import">Import Report</a>
         <a href="{{ url_for('load_sample', sample_type='xml') }}" class="btn btn-secondary" id="btn-sample">Load Sample Data</a>
-        <a href="{{ url_for('scan_history') }}" class="btn btn-secondary">View Scan History</a>
     </div>
 </div>
 {% endif %}

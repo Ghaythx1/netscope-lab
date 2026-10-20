@@ -27,8 +27,11 @@ from flask import (
     url_for,
 )
 
+from netscope_lab.analysis.cve_correlator import ThreatCorrelator
+from netscope_lab.analysis.network_calc import NetworkCalculator
 from netscope_lab.analysis.risk_engine import Finding, RiskEngine
 from netscope_lab.analysis.stats import compute_statistics
+from netscope_lab.analysis.web_recon import WebSecurityRecon
 from netscope_lab.config import config_map
 from netscope_lab.history_store import initialize as initialize_history
 from netscope_lab.history_store import list_scans, load_latest, load_scan, save_scan
@@ -36,6 +39,7 @@ from netscope_lab.models.scan_data import ScanResult
 from netscope_lab.parsers.json_parser import parse_json_report
 from netscope_lab.parsers.nmap_xml import parse_nmap_xml
 from netscope_lab.reports.exporter import ReportExporter
+from netscope_lab.scanner.fast_socket_scanner import FastScanConfig, FastSocketScanner
 from netscope_lab.scanner.nmap_runner import (
     SCAN_TYPES,
     NmapNotFoundError,
@@ -107,11 +111,17 @@ def _register_routes(app: Flask) -> None:
     @app.route("/")
     def dashboard():
         """Main dashboard page."""
+        posture = (
+            RiskEngine.compute_security_posture(_current_findings, len(_current_scan.hosts))
+            if _current_scan and _current_scan.hosts
+            else {}
+        )
         return render_template(
             "dashboard.html",
             scan=_current_scan,
             stats=_current_stats,
             findings=_current_findings,
+            posture=posture,
             has_data=_current_scan is not None and len(_current_scan.hosts) > 0,
         )
 
@@ -379,9 +389,169 @@ def _register_routes(app: Flask) -> None:
                 mimetype="text/csv; charset=utf-8",
                 headers={"Content-Disposition": "attachment; filename=netscope_ports.csv"},
             )
+        elif format_type == "markdown":
+            content = exporter.to_markdown(_current_scan, _current_findings, _current_stats)
+            return Response(
+                content,
+                mimetype="text/markdown; charset=utf-8",
+                headers={"Content-Disposition": "attachment; filename=netscope_assessment.md"},
+            )
+        elif format_type == "executive":
+            content = json.dumps(exporter.to_executive_summary(_current_scan, _current_findings, _current_stats), indent=2)
+            return Response(
+                content,
+                mimetype="application/json",
+                headers={"Content-Disposition": "attachment; filename=netscope_executive_summary.json"},
+            )
         else:
             flash("Unsupported export format.", "error")
             return redirect(url_for("reports"))
+
+    # ------------------------------------------------------------------
+    # NetScope Lab v2.0 New Feature Routes
+    # ------------------------------------------------------------------
+
+    @app.route("/fast-scan", methods=["GET", "POST"])
+    def fast_scan_view():
+        """Native multi-threaded socket scanner view."""
+        global _current_scan, _current_findings, _current_stats
+        target_prefill = request.args.get("target", "127.0.0.1")
+
+        if request.method == "POST":
+            target = request.form.get("target", "").strip()
+            port_spec = request.form.get("ports", "top20").strip()
+            timeout = float(request.form.get("timeout", "0.8"))
+            workers = int(request.form.get("workers", "50"))
+            grab_banners = request.form.get("grab_banners") is not None
+
+            if not target:
+                flash("Please specify a target IP, hostname, or CIDR range.", "error")
+                return redirect(url_for("fast_scan_view"))
+
+            try:
+                targets = FastSocketScanner.resolve_targets(target)
+                ports = FastSocketScanner.parse_ports(port_spec)
+                config = FastScanConfig(
+                    targets=targets,
+                    ports=ports,
+                    timeout=timeout,
+                    max_workers=workers,
+                    grab_banners=grab_banners,
+                )
+                scanner = FastSocketScanner(config)
+                result = scanner.run_scan()
+
+                _current_scan = result
+                _current_findings = RiskEngine().analyze(_current_scan)
+                _current_stats = compute_statistics(_current_scan)
+                save_scan(
+                    app.config["DATABASE_PATH"],
+                    _current_scan,
+                    target=target,
+                    scan_type="fast-socket",
+                )
+                flash(f"Fast scan completed: {len(_current_scan.hosts)} active hosts discovered.", "success")
+                return redirect(url_for("dashboard"))
+            except Exception as e:
+                logger.exception("Fast scan failed")
+                flash(f"Scan error: {str(e)}", "error")
+                return redirect(url_for("fast_scan_view"))
+
+        return render_template(
+            "fast_scan.html",
+            last_target=target_prefill,
+            has_data=_current_scan is not None,
+        )
+
+    @app.route("/api/fast-scan", methods=["POST"])
+    def api_fast_scan():
+        """JSON API for programmatic fast socket scanning."""
+        data = request.get_json(silent=True) or {}
+        target = data.get("target", "127.0.0.1")
+        port_spec = data.get("ports", "top20")
+        timeout = float(data.get("timeout", 0.8))
+        workers = int(data.get("workers", 30))
+
+        targets = FastSocketScanner.resolve_targets(target)
+        ports = FastSocketScanner.parse_ports(port_spec)
+        config = FastScanConfig(targets=targets, ports=ports, timeout=timeout, max_workers=workers)
+        result = FastSocketScanner(config).run_scan()
+        exporter = ReportExporter()
+        return Response(
+            exporter.to_json(result, RiskEngine().analyze(result), compute_statistics(result)),
+            mimetype="application/json",
+        )
+
+    @app.route("/threat-intel")
+    def threat_intel_view():
+        """Threat intelligence & CVE correlation page."""
+        if not _current_scan or not _current_scan.hosts:
+            flash("No scan data loaded. Run a scan or import a report first.", "error")
+            return redirect(url_for("dashboard"))
+
+        advisories = ThreatCorrelator.correlate_scan(_current_scan)
+        posture = RiskEngine.compute_security_posture(_current_findings, len(_current_scan.hosts))
+
+        return render_template(
+            "threat_intel.html",
+            advisories=advisories,
+            findings=_current_findings,
+            posture=posture,
+            stats=_current_stats,
+            has_data=True,
+        )
+
+    @app.route("/topology")
+    def topology_view():
+        """Interactive Network Topology visualizer."""
+        hosts_list = _current_scan.hosts if _current_scan else []
+        return render_template(
+            "topology.html",
+            hosts=hosts_list,
+            findings=_current_findings,
+            has_data=_current_scan is not None and len(hosts_list) > 0,
+        )
+
+    @app.route("/cidr-calc", methods=["GET", "POST"])
+    def cidr_calc_view():
+        """CIDR & Subnet calculator tool."""
+        cidr_input = request.form.get("cidr", "") if request.method == "POST" else request.args.get("cidr", "192.168.1.0/24")
+        details = NetworkCalculator.calculate(cidr_input) if cidr_input else None
+        return render_template(
+            "cidr_calc.html",
+            cidr_input=cidr_input,
+            details=details,
+            has_data=_current_scan is not None,
+        )
+
+    @app.route("/web-recon", methods=["GET", "POST"])
+    def web_recon_view():
+        """Web security headers & TLS reconnaissance."""
+        detected_web: list[dict[str, Any]] = []
+        if _current_scan:
+            for h in _current_scan.hosts:
+                for p in h.open_ports:
+                    if p.port_id in (80, 443, 8000, 8080, 8443, 8888, 5000, 3000) or "http" in p.service.name.lower():
+                        detected_web.append({"host": h.ip_address, "port": p.port_id})
+
+        host_input = request.form.get("host", "").strip() if request.method == "POST" else request.args.get("host", "")
+        port_input = request.form.get("port", "").strip() if request.method == "POST" else request.args.get("port", "")
+
+        recon = None
+        if host_input and port_input:
+            try:
+                recon = WebSecurityRecon.analyze_endpoint(host_input, int(port_input))
+            except Exception as e:
+                flash(f"Recon probe error: {e}", "error")
+
+        return render_template(
+            "web_recon.html",
+            host_input=host_input,
+            port_input=port_input,
+            detected_web_ports=detected_web,
+            recon=recon,
+            has_data=_current_scan is not None,
+        )
 
     @app.route("/api/stats")
     def api_stats():

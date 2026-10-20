@@ -1,67 +1,102 @@
-# NetScope Lab
+# 🔬 NetScope Lab v2.0 Pro
 
-NetScope Lab runs Nmap scans from a local web dashboard, parses the XML results, and displays discovered hosts, ports, services, and review findings. Importing an existing XML or JSON report remains available as an optional workflow.
+**NetScope Lab** is a modern, enterprise-grade Cybersecurity Reconnaissance, Network Mapping, and Vulnerability Assessment Platform.
 
-## Install on Kali Linux
+It offers both an interactive **Nmap-driven scanner** and a **Fast Native Python Socket Scanner & Banner Grabber** that works cross-platform (Windows, Linux, macOS) without requiring root or external binaries.
 
+---
+
+## 🚀 What's New in v2.0
+
+- ⚡ **Fast Native Socket Scanner:** Pure Python multi-threaded port scanner and banner grabber (no Nmap or root privileges required).
+- 🌐 **Interactive Network Topology Map:** Live SVG constellation map showing the subnet gateway, host nodes, color-coded risk rings, and port counts.
+- 🛡️ **Threat Intelligence & CVE Correlation:** Automatic CVE advisory lookup (e.g. Apache Path Traversal, OpenSSH, SambaCry, EternalBlue) with CVSS v3 severity scores.
+- 🎯 **MITRE ATT&CK Matrix Mapping:** Findings mapped to enterprise MITRE ATT&CK techniques (T1190, T1021, T1040, T1046, etc.).
+- 🏆 **Security Posture Scorecard:** Dynamic 0–100 security score and letter grades (A+, A, B, C, D, F) with concrete remediation action counts.
+- 🧮 **CIDR & Subnet Calculator:** Subnet mask, wildcard mask, usable IP ranges, broadcast calculation, and 1-click subnet scanning.
+- 🌐 **Web Security & Headers Recon:** Probes HTTP/HTTPS endpoints for missing security headers (`HSTS`, `CSP`, `X-Frame-Options`, `nosniff`), software banners, and TLS protocols.
+- 📝 **Markdown & Executive Reports:** Export print-ready Markdown assessment writeups and executive JSON metric summaries.
+
+---
+
+## 🛠️ Installation & Running
+
+### Requirements
+- Python 3.9+
+- Optional: `nmap` (if you want to use the Nmap engine)
+
+### Setup
 ```bash
-sudo apt update
-sudo apt install -y nmap python3 python3-venv
-cd /path/to/project1
-python3 -m venv .venv
+# Clone or navigate to the repository
+cd project1
+
+# Create and activate virtual environment
+python -m venv .venv
+
+# On Linux/macOS:
 source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
+# On Windows:
+.venv\Scripts\activate
 
-## Start the application
+# Install dependencies
+pip install -r requirements.txt
 
-For scan modes that work without raw-packet privileges:
-
-```bash
-source .venv/bin/activate
+# Run the platform
 python run.py
 ```
 
-For SYN, full, aggressive, or UDP scans that need elevated privileges, start the local app with sudo:
+Then open your browser at **http://127.0.0.1:5000**.
+
+---
+
+## 🌟 Available Core Modules
+
+### 1. ⚡ Fast Native Scanner (`/fast-scan`)
+- Multithreaded TCP port scanner written purely in Python.
+- Presets: Top 20 Critical, Top 35 Common, Web services, Database ports, or custom ranges.
+- Grabs service banners from HTTP, SSH, FTP, SMTP, MySQL.
+- Resolves CIDR blocks (up to /24) and hostnames.
+
+### 2. 🎯 Nmap Live Scanner (`/scan`)
+- Full integration with Nmap binary.
+- Modes: Ping Sweep, Quick Scan, SYN Stealth, Service Detection, Full Scan, Aggressive Scan, Vulnerability Scripts (NSE), UDP.
+- Real-time phase progress and estimated completion time.
+
+### 3. 🌐 Interactive Network Topology (`/topology`)
+- Real-time animated diagram of the scanned subnet.
+- Node inspection panel displaying live host status, open ports, and risk levels.
+
+### 4. 🛡️ Threat Intelligence & CVEs (`/threat-intel`)
+- Correlates discovered service versions with critical CVE databases.
+- Displays CVSS scores, exploitability status, and step-by-step remediation advice.
+
+### 5. 🧮 Subnet & CIDR Calculator (`/cidr-calc`)
+- Calculate network address, usable host ranges, binary masks, and network scopes (RFC1918 Private, Global WAN, Loopback).
+- Direct button to scan the calculated range with Fast Scanner.
+
+### 6. 🌐 Web Security Recon (`/web-recon`)
+- Audits HTTP and HTTPS services on any port.
+- Evaluates essential security headers (`Strict-Transport-Security`, `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`).
+- Inspects TLS ciphers, version, and server disclosure banners.
+
+### 7. 📋 Multi-Format Exporting (`/reports`)
+- **HTML Report:** Styled standalone report for offline viewing.
+- **Markdown (.md):** GitHub-flavored assessment report for pentest writeups.
+- **JSON Report:** Complete structured data for CI/CD or pipeline integration.
+- **CSV Inventory:** Port-by-port spreadsheet for asset tracking.
+- **Executive Metrics:** High-level posture scorecard and critical items.
+
+---
+
+## 🧪 Testing
+
+Run the comprehensive test suite with 90+ tests:
 
 ```bash
-sudo .venv/bin/python run.py
+python -m pytest -v
 ```
 
-Then open <http://127.0.0.1:5000>. The app listens on the local machine only. Stop it with `Ctrl+C` in the terminal. Live phase progress and Nmap's estimated time remaining appear while scanning. The browser remembers up to 12 recent targets and up to 12 complete scan configurations, including scan type and ports, so you can select a prior target or repeat a scan without retyping it.
+---
 
-Scan snapshots are saved in a local SQLite database under `instance/`. Use **Scan History** to reopen a previous result after restarting the app, or compare two snapshots to review newly seen hosts, newly open ports, ports no longer reported open, and changed service/version detections.
-
-## Run a scan and view results
-
-1. Open **Live Scan** (or **Start a Live Scan** from the empty dashboard).
-2. Enter an IP address, CIDR range, Nmap IPv4 range, or hostname you own or are authorized to assess.
-3. Choose a scan type and optionally enter ports such as `22,80,443` or `1-1024`.
-4. Start the scan. The status page shows progress; when it finishes, choose **View Dashboard** to see the hosts, open ports, services, statistics, and findings. The Hosts, Findings, and Reports pages provide more detail and exports.
-
-Scanning systems without permission may be unlawful. Use this tool only on systems and networks you own or have explicit authorization to test. Large or intensive scans can take a long time.
-
-## Available scan modes
-
-- **Ping Sweep** discovers responsive hosts without checking ports.
-- **Quick Scan** checks common TCP ports.
-- **Service Detection** attempts to identify services and versions.
-- **SYN**, **Full**, **Aggressive**, and **UDP** modes may need root privileges and can generate more traffic.
-- **Vulnerability Scripts** runs Nmap's `vuln` NSE category and can be intrusive; use only with explicit authorization.
-- **TCP Connect** works without raw-packet privileges; **All TCP Ports** checks the complete TCP port range.
-- **TCP + UDP** checks common ports for both protocols in one run; it requires elevated privileges.
-
-## Scan controls
-
-- Choose the scan profile's default port coverage, the top 100 or 1,000 ports, all ports, or a custom list/range.
-- Select Nmap timing T2 (careful), T3 (balanced), or T4 (fast), and set a 30-minute, 1-hour, or 2-hour maximum runtime.
-- Exclude a host or CIDR from a range scan, skip host discovery for systems that block probes, or disable reverse DNS lookups.
-- Enter up to 256 IPs, hostnames, CIDRs, or ranges as comma-separated values or one target per line.
-- Add light or intensive service/version probes, OS detection, route tracing, or Nmap's safe NSE script category.
-- Scan progress follows Nmap's current phase; the estimated remaining time is approximate and may change as Nmap moves between phases.
-
-All-ports, UDP, aggressive, and vulnerability-script scans can create substantial traffic and take a long time. Use them only within an authorized scope.
-
-## Import and sample data
-
-Use **Import** to load an existing Nmap XML report or a supported JSON scan report. Sample data can be loaded from the Import page for a demonstration; it is not loaded automatically at startup.
+## ⚖️ Legal Disclaimer
+*NetScope Lab is designed strictly for authorized security assessments, network inventory, and educational laboratory research. Scanning systems without explicit authorization is illegal. Use responsibly.*

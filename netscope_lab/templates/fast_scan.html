@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab v2.0 — Fast Native Scanner{% endblock %}
+{% block page_title %}⚡ Fast Native Socket Scanner{% endblock %}
+
+{% block content %}
+<div class="scan-header-card">
+    <div class="scan-header-content">
+        <h2>Native Multithreaded TCP Scanner & Banner Grabber</h2>
+        <p class="text-muted">
+            High-speed port scanner built in pure Python. Runs cross-platform without needing Nmap or administrative root privileges.
+            Supports banner grabbing (HTTP, SSH, FTP, MySQL, SMTP) and instant network discovery.
+        </p>
+    </div>
+    <div class="scan-header-badge">
+        <span class="badge badge-success">No Root Required</span>
+        <span class="badge badge-primary">v2.0 Native</span>
+    </div>
+</div>
+
+<div class="grid-2-col">
+    <div class="card form-card">
+        <form method="POST" action="{{ url_for('fast_scan_view') }}" id="fast-scan-form">
+            <div class="form-group">
+                <label for="target" class="form-label">
+                    Target Host / IP / CIDR Subnet:
+                    <span class="text-danger">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="target"
+                    name="target"
+                    class="form-control font-mono"
+                    placeholder="e.g. 127.0.0.1, 192.168.1.1, scanme.nmap.org, or 192.168.1.0/28"
+                    value="{{ last_target or '127.0.0.1' }}"
+                    required
+                >
+                <span class="form-help">Enter an IP address, hostname, or small CIDR subnet (up to /24).</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Port Profile:</label>
+                <div class="radio-presets">
+                    <button type="button" class="btn btn-outline btn-sm preset-btn" onclick="setPorts('top20')">Top 20 Critical</button>
+                    <button type="button" class="btn btn-outline btn-sm preset-btn" onclick="setPorts('common')">Top 35 Common</button>
+                    <button type="button" class="btn btn-outline btn-sm preset-btn" onclick="setPorts('web')">Web (80,443,8080,8443)</button>
+                    <button type="button" class="btn btn-outline btn-sm preset-btn" onclick="setPorts('db')">Databases (3306,5432,6379,27017)</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="ports" class="form-label">Port Specification:</label>
+                <input
+                    type="text"
+                    id="ports"
+                    name="ports"
+                    class="form-control font-mono"
+                    placeholder="e.g. 21,22,80,443,3306,8080 or 1-1024"
+                    value="top20"
+                >
+                <span class="form-help">Type custom ports or comma-separated ranges.</span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-half">
+                    <label for="timeout" class="form-label">Socket Timeout (sec):</label>
+                    <input type="number" id="timeout" name="timeout" class="form-control" value="0.8" step="0.1" min="0.2" max="5.0">
+                </div>
+                <div class="form-group col-half">
+                    <label for="workers" class="form-label">Concurrent Threads:</label>
+                    <input type="number" id="workers" name="workers" class="form-control" value="50" min="5" max="200">
+                </div>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="grab_banners" checked>
+                    <span><strong>Grab Service Banners</strong> (Analyze HTTP headers, SSH/FTP version strings)</span>
+                </label>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg" id="btn-start-fast-scan">
+                    ⚡ Start Fast Scan
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card info-card">
+        <h3>⚡ Why Fast Socket Scanner?</h3>
+        <ul class="feature-list">
+            <li>
+                <strong>Instant Execution:</strong> Starts probing in under 50ms using Python concurrent socket threads.
+            </li>
+            <li>
+                <strong>Zero Prerequisites:</strong> Doesn't require Nmap binaries, winpcap, or root permissions.
+            </li>
+            <li>
+                <strong>Integrated Threat Engine:</strong> Automatically parses open ports into findings, CVE lookups, and executive scorecards.
+            </li>
+            <li>
+                <strong>Banner Fingerprinting:</strong> Inspects TLS certificates, Server HTTP headers, and raw service responses.
+            </li>
+        </ul>
+
+        <div class="quick-test-box">
+            <h4>Quick Scan Targets:</h4>
+            <div class="badge-group">
+                <span class="clickable-badge" onclick="setTarget('127.0.0.1')">localhost (127.0.0.1)</span>
+                <span class="clickable-badge" onclick="setTarget('scanme.nmap.org')">scanme.nmap.org</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setPorts(type) {
+    const input = document.getElementById('ports');
+    if (type === 'top20') input.value = 'top20';
+    else if (type === 'common') input.value = 'common';
+    else if (type === 'web') input.value = '80,443,8000,8080,8443,8888';
+    else if (type === 'db') input.value = '1433,1521,3306,5432,6379,9200,27017';
+}
+function setTarget(t) {
+    document.getElementById('target').value = t;
+}
+</script>
+{% endblock %}

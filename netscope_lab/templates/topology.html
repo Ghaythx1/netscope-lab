@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab v2.0 — Network Topology Visualizer{% endblock %}
+{% block page_title %}🌐 Interactive Network Topology{% endblock %}
+
+{% block content %}
+<div class="topology-container">
+    <div class="topology-toolbar">
+        <div class="toolbar-info">
+            <span class="badge badge-primary">Dynamic Graph</span>
+            <span class="text-muted">Showing {{ hosts|length }} hosts in current assessment subnet</span>
+        </div>
+        <div class="toolbar-legend">
+            <span class="legend-item"><span class="legend-dot dot-critical"></span> Critical / High Risk</span>
+            <span class="legend-item"><span class="legend-dot dot-warning"></span> Medium Risk</span>
+            <span class="legend-item"><span class="legend-dot dot-safe"></span> Low / Safe Host</span>
+        </div>
+    </div>
+
+    <div class="topology-canvas-wrapper">
+        <svg id="topology-svg" class="topology-svg" viewBox="0 0 900 550" preserveAspectRatio="xMidYMid meet">
+            <defs>
+                <filter id="glow-gateway" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+                <filter id="glow-node" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+            </defs>
+
+            <!-- Dynamic connections and nodes rendered via JavaScript -->
+            <g id="topology-links"></g>
+            <g id="topology-nodes"></g>
+        </svg>
+
+        <div id="host-inspector" class="host-inspector card" style="display: none;">
+            <div class="inspector-header">
+                <h4 id="inspector-ip" class="font-mono">192.168.1.1</h4>
+                <button class="btn-close" onclick="closeInspector()">&times;</button>
+            </div>
+            <p id="inspector-status" class="text-sm text-muted">Status: UP</p>
+            <div class="inspector-ports">
+                <h5>Open Ports (<span id="inspector-ports-count">0</span>):</h5>
+                <div id="inspector-ports-list" class="ports-tag-list"></div>
+            </div>
+            <div class="inspector-actions mt-3">
+                <a id="inspector-link" href="#" class="btn btn-primary btn-sm">View Host Full Analysis &rarr;</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const hostsData = [
+    {% for host in hosts %}
+    {
+        ip: {{ host.ip_address|tojson }},
+        hostnames: {{ host.hostnames|tojson }},
+        status: {{ host.status|tojson }},
+        ports: [
+            {% for p in host.open_ports %}
+            { port: {{ p.port_id }}, protocol: {{ p.protocol|tojson }}, service: {{ p.service.display_name()|tojson }} },
+            {% endfor %}
+        ],
+        hasHigh: {{ (findings|selectattr('host_ip', 'equalto', host.ip_address)|selectattr('severity', 'in', ['high', 'critical'])|list|length > 0)|tojson }},
+        hasMedium: {{ (findings|selectattr('host_ip', 'equalto', host.ip_address)|selectattr('severity', 'equalto', 'medium')|list|length > 0)|tojson }}
+    },
+    {% endfor %}
+];
+
+function renderTopology() {
+    const svgLinks = document.getElementById('topology-links');
+    const svgNodes = document.getElementById('topology-nodes');
+    svgLinks.innerHTML = '';
+    svgNodes.innerHTML = '';
+
+    const centerX = 450;
+    const centerY = 275;
+    const radius = 200;
+
+    // Center Gateway
+    const gatewayG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    gatewayG.setAttribute('class', 'gateway-node');
+    gatewayG.innerHTML = `
+        <circle cx="${centerX}" cy="${centerY}" r="32" fill="#1e293b" stroke="#38bdf8" stroke-width="3" filter="url(#glow-gateway)" />
+        <text x="${centerX}" y="${centerY - 4}" text-anchor="middle" fill="#38bdf8" font-size="14" font-weight="bold">GATEWAY</text>
+        <text x="${centerX}" y="${centerY + 14}" text-anchor="middle" fill="#94a3b8" font-size="11">Subnet Core</text>
+    `;
+    svgNodes.appendChild(gatewayG);
+
+    if (hostsData.length === 0) {
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', centerX);
+        text.setAttribute('y', centerY + 80);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('fill', '#94a3b8');
+        text.textContent = 'No hosts discovered in current assessment. Run a scan to populate.';
+        svgNodes.appendChild(text);
+        return;
+    }
+
+    const angleStep = (2 * Math.PI) / hostsData.length;
+
+    hostsData.forEach((host, i) => {
+        const angle = i * angleStep;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+
+        // Connection line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', centerX);
+        line.setAttribute('y1', centerY);
+        line.setAttribute('x2', x);
+        line.setAttribute('y2', y);
+        line.setAttribute('stroke', '#334155');
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke-dasharray', '4 4');
+        svgLinks.appendChild(line);
+
+        // Node color
+        let color = '#22c55e'; // safe
+        if (host.hasHigh) color = '#ef4444'; // critical/high
+        else if (host.hasMedium) color = '#f59e0b'; // medium
+
+        const nodeG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        nodeG.setAttribute('class', 'host-svg-node');
+        nodeG.setAttribute('style', 'cursor: pointer;');
+        nodeG.onclick = () => showInspector(host, x, y);
+
+        nodeG.innerHTML = `
+            <circle cx="${x}" cy="${y}" r="22" fill="#0f172a" stroke="${color}" stroke-width="2.5" filter="url(#glow-node)" />
+            <text x="${x}" y="${y + 5}" text-anchor="middle" fill="${color}" font-size="11" font-weight="bold">${host.ports.length}P</text>
+            <text x="${x}" y="${y + 36}" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="monospace">${host.ip}</text>
+        `;
+        svgNodes.appendChild(nodeG);
+    });
+}
+
+function showInspector(host, x, y) {
+    const inspector = document.getElementById('host-inspector');
+    document.getElementById('inspector-ip').textContent = host.ip + (host.hostnames.length ? ' (' + host.hostnames.join(', ') + ')' : '');
+    document.getElementById('inspector-status').textContent = 'Status: ' + host.status.toUpperCase();
+    document.getElementById('inspector-ports-count').textContent = host.ports.length;
+
+    const list = document.getElementById('inspector-ports-list');
+    list.innerHTML = '';
+    if (host.ports.length === 0) {
+        list.innerHTML = '<span class="text-muted text-sm">No open ports</span>';
+    } else {
+        host.ports.forEach(p => {
+            const span = document.createElement('span');
+            span.className = 'port-pill';
+            span.textContent = p.port + '/' + p.protocol + ' ' + (p.service || '');
+            list.appendChild(span);
+        });
+    }
+
+    document.getElementById('inspector-link').href = '/host/' + encodeURIComponent(host.ip);
+    inspector.style.display = 'block';
+}
+
+function closeInspector() {
+    document.getElementById('host-inspector').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', renderTopology);
+</script>
+{% endblock %}

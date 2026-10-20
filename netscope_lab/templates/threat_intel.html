@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab v2.0 — Threat Intelligence & CVE Correlation{% endblock %}
+{% block page_title %}🛡️ Threat Intelligence & CVE Correlation{% endblock %}
+
+{% block content %}
+<div class="posture-banner">
+    <div class="posture-score-box">
+        <div class="posture-grade-badge grade-{{ posture.grade|lower|replace('+', '-plus') }}">{{ posture.grade }}</div>
+        <div class="posture-score-number">{{ posture.score }} <span class="score-max">/ 100</span></div>
+    </div>
+    <div class="posture-details">
+        <h2>{{ posture.level }}</h2>
+        <p class="text-muted">
+            Evaluated across {{ stats.total_hosts or 0 }} discovered hosts and {{ stats.total_open_ports or 0 }} open network ports.
+            Correlated with known Common Vulnerabilities and Exposures (CVEs) and MITRE ATT&CK enterprise tactics.
+        </p>
+        <div class="posture-pills">
+            <span class="pill pill-danger">🔴 {{ posture.counts.critical }} Critical</span>
+            <span class="pill pill-warning">🟠 {{ posture.counts.high }} High</span>
+            <span class="pill pill-medium">🟡 {{ posture.counts.medium }} Medium</span>
+            <span class="pill pill-info">🔵 {{ posture.counts.low }} Low</span>
+            <span class="pill pill-remediation">🛠️ {{ posture.remediation_actions }} Actionable Blueprints</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card">
+    <div class="section-card-header">
+        <h3>🔍 Identified Threat Advisories & Correlated CVEs</h3>
+        <span class="badge badge-info">{{ advisories|length }} Matches</span>
+    </div>
+
+    {% if advisories %}
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>CVE ID</th>
+                    <th>Advisory Title</th>
+                    <th>Target Host / Port</th>
+                    <th>MITRE ATT&CK</th>
+                    <th>Exploitability</th>
+                    <th>Remediation Blueprint</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for adv in advisories %}
+                <tr>
+                    <td>
+                        <span class="severity-badge sev-{{ adv.severity|lower }}">
+                            {{ adv.severity|upper }} ({{ adv.cvss_score }})
+                        </span>
+                    </td>
+                    <td>
+                        <strong class="font-mono text-accent">{{ adv.cve_id }}</strong>
+                    </td>
+                    <td>
+                        <strong>{{ adv.title }}</strong>
+                        <div class="text-muted text-sm">{{ adv.service }}</div>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('host_detail', host_ip=adv.host_ip) }}" class="font-mono">
+                            {{ adv.host_ip }}:{{ adv.port }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="mitre-tag">{{ adv.mitre_attack }}</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-outline-warning">{{ adv.exploitability }}</span>
+                    </td>
+                    <td>
+                        <div class="remediation-text">{{ adv.remediation }}</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🛡️</div>
+        <h3>No Specific High-Risk CVEs Correlated</h3>
+        <p class="text-muted">None of the detected service banners directly match known critical version vulnerabilities in our database.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="section-card mt-4">
+    <div class="section-card-header">
+        <h3>📋 All Rule Findings with Remediation Guidance</h3>
+        <span class="badge badge-primary">{{ findings|length }} Total Rules Triggered</span>
+    </div>
+
+    <div class="findings-list">
+        {% for f in findings %}
+        <div class="finding-card finding-{{ f.severity|lower }}">
+            <div class="finding-card-header">
+                <div class="finding-title-group">
+                    <span class="severity-badge sev-{{ f.severity|lower }}">{{ f.severity|upper }}</span>
+                    <h4>{{ f.rule_name }}</h4>
+                    <span class="font-mono text-muted text-sm">{{ f.rule_id }}</span>
+                </div>
+                <div class="finding-target">
+                    {% if f.host_ip %}
+                    <span class="target-tag">{{ f.host_ip }}{% if f.port %}:{{ f.port }}{% endif %}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <p class="finding-desc">{{ f.description }}</p>
+
+            <div class="finding-meta-grid">
+                <div class="meta-item">
+                    <span class="meta-label">Evidence:</span>
+                    <span class="meta-value font-mono">{{ f.evidence }}</span>
+                </div>
+                {% if f.mitre_attack %}
+                <div class="meta-item">
+                    <span class="meta-label">MITRE ATT&CK:</span>
+                    <span class="meta-value">{{ f.mitre_attack }}</span>
+                </div>
+                {% endif %}
+                {% if f.remediation %}
+                <div class="meta-item meta-remediation">
+                    <span class="meta-label">🛠️ Recommended Action:</span>
+                    <span class="meta-value text-success font-semibold">{{ f.remediation }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

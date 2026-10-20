@@ -34,6 +34,24 @@
             Download CSV Inventory
         </a>
     </div>
+
+    <div class="export-card" id="export-markdown">
+        <div class="export-icon">📝</div>
+        <h3>Markdown Assessment</h3>
+        <p>Generate a GitHub-flavored Markdown report formatted with findings, CVEs, MITRE ATT&CK techniques, and remediation blueprints.</p>
+        <a href="{{ url_for('export_report', format_type='markdown') }}" class="btn btn-primary" id="btn-export-markdown">
+            Download Markdown (.md)
+        </a>
+    </div>
+
+    <div class="export-card" id="export-executive">
+        <div class="export-icon">🏆</div>
+        <h3>Executive Scorecard</h3>
+        <p>Export executive JSON metrics with calculated Security Grade (A-F), Posture Score (0-100), and critical action items.</p>
+        <a href="{{ url_for('export_report', format_type='executive') }}" class="btn btn-primary" id="btn-export-executive">
+            Download Executive Metrics
+        </a>
+    </div>
 </div>
 {% else %}
 <div class="empty-state">

@@ -1,11 +1,9 @@
 """
-NetScope Lab — Configurable risk-rule engine.
+NetScope Lab v2.0 — Enterprise Risk Engine & Threat Correlation.
 
-Evaluates hosts and ports against transparent, configurable rules.
-Each rule explains what it checks, the evidence it found, and its limitations.
-
-IMPORTANT: No rule claims a confirmed vulnerability. Rules identify conditions
-that MAY warrant further investigation.
+Evaluates hosts and ports against transparent, configurable security rules.
+Each rule explains what it checks, evidence found, MITRE ATT&CK techniques,
+CVSS severity mapping, and actionable remediation blueprints.
 """
 
 from __future__ import annotations
@@ -24,7 +22,7 @@ class Finding:
     """A single finding produced by a risk rule."""
     rule_id: str
     rule_name: str
-    severity: str  # "info", "low", "medium", "high"
+    severity: str  # "critical", "high", "medium", "low", "info"
     description: str
     evidence: str
     limitation: str
@@ -32,10 +30,20 @@ class Finding:
     port: int | None = None
     protocol: str = ""
     service: str = ""
+    cve_id: str = ""
+    cvss_score: float = 0.0
+    mitre_attack: str = ""
+    remediation: str = ""
 
     @property
     def severity_order(self) -> int:
-        return {"high": 0, "medium": 1, "low": 2, "info": 3}.get(self.severity, 4)
+        return {
+            "critical": 0,
+            "high": 1,
+            "medium": 2,
+            "low": 3,
+            "info": 4,
+        }.get(self.severity.lower(), 5)
 
 
 @dataclass
@@ -47,116 +55,225 @@ class RiskRule:
     severity: str
     limitation: str
     enabled: bool = True
+    cve_id: str = ""
+    cvss_score: float = 0.0
+    mitre_attack: str = ""
+    remediation: str = ""
     # Matching criteria
     ports: list[int] = field(default_factory=list)
     services: list[str] = field(default_factory=list)
     products: list[str] = field(default_factory=list)
 
 
-# Default rules — transparent and conservative
+# Expanded Rule Set for NetScope Lab v2.0
 DEFAULT_RULES: list[dict[str, Any]] = [
     {
         "rule_id": "EXPOSED_TELNET",
         "name": "Telnet Service Detected",
-        "description": "Telnet transmits data including credentials in cleartext. "
-                       "If this service is intentionally exposed, ensure it is adequately secured.",
+        "description": "Telnet transmits data including credentials in plaintext. "
+                       "If this service is intentionally exposed, ensure it is migrated to SSH.",
         "severity": "high",
-        "limitation": "Detection is based on port/service identification only. "
-                      "The service may be a honeypot, behind a VPN, or otherwise protected.",
+        "limitation": "Detection is based on port/service identification only.",
+        "cve_id": "",
+        "cvss_score": 7.5,
+        "mitre_attack": "T1040 - Network Sniffing",
+        "remediation": "Disable Telnet daemon and migrate management access to OpenSSH.",
         "ports": [23],
         "services": ["telnet"],
     },
     {
         "rule_id": "EXPOSED_FTP",
         "name": "FTP Service Detected",
-        "description": "FTP can transmit credentials in cleartext. Consider using SFTP or FTPS instead.",
+        "description": "FTP transmits credentials in plaintext without TLS. Consider using SFTP or FTPS instead.",
         "severity": "medium",
-        "limitation": "FTP may be configured with TLS (FTPS) which mitigates cleartext risks. "
-                      "Further investigation is needed.",
+        "limitation": "FTP may be configured with TLS (FTPS) which mitigates cleartext risks.",
+        "cve_id": "",
+        "cvss_score": 5.3,
+        "mitre_attack": "T1040 - Network Sniffing",
+        "remediation": "Enforce FTPS or transition file transfers to SFTP (Port 22). Disable anonymous login.",
         "ports": [21],
         "services": ["ftp"],
     },
     {
         "rule_id": "EXPOSED_SMB",
-        "name": "SMB/CIFS Service Detected",
-        "description": "SMB services exposed to untrusted networks may present a risk. "
-                       "Historically targeted by ransomware and worms.",
+        "name": "SMB/CIFS Service Exposed",
+        "description": "SMB services exposed to untrusted networks present severe attack surface. "
+                       "Historically leveraged by ransomware (WannaCry, NotPetya) and worms.",
         "severity": "high",
-        "limitation": "The service version and patch level cannot be determined from port scanning alone. "
-                      "Modern SMB configurations may be adequately secured.",
+        "limitation": "Patch level cannot be determined from port scan alone. Modern SMB3 with encryption may be secure.",
+        "cve_id": "CVE-2017-0144",
+        "cvss_score": 9.8,
+        "mitre_attack": "T1210 - Exploitation of Remote Services",
+        "remediation": "Block TCP port 445 at firewall boundaries. Disable SMBv1 and enforce SMB signing/encryption.",
         "ports": [445, 139],
         "services": ["microsoft-ds", "netbios-ssn"],
     },
     {
         "rule_id": "EXPOSED_RDP",
         "name": "RDP Service Detected",
-        "description": "Remote Desktop Protocol exposed to untrusted networks may be targeted "
-                       "by brute-force attacks.",
+        "description": "Remote Desktop Protocol exposed to networks is heavily targeted by credential stuffing and brute-force.",
         "severity": "medium",
-        "limitation": "RDP may be protected by Network Level Authentication, MFA, or VPN. "
-                      "Port detection alone does not indicate a vulnerability.",
+        "limitation": "RDP may be protected by Network Level Authentication (NLA) or MFA.",
+        "cve_id": "CVE-2019-0708",
+        "cvss_score": 8.1,
+        "mitre_attack": "T1021.001 - Remote Desktop Protocol",
+        "remediation": "Place RDP behind a VPN, enforce NLA, enable MFA, and limit access via IP whitelisting.",
         "ports": [3389],
         "services": ["ms-wbt-server"],
     },
     {
         "rule_id": "EXPOSED_SSH",
         "name": "SSH Service Detected",
-        "description": "SSH is generally secure, but exposure to untrusted networks increases "
-                       "brute-force attack surface.",
+        "description": "SSH is secure by design, but exposure to untrusted networks increases brute-force attack surface.",
         "severity": "low",
-        "limitation": "SSH with key-based auth and fail2ban is considered secure. "
-                      "This finding is informational.",
+        "limitation": "SSH with key-based authentication and fail2ban is safe. Finding is informational.",
+        "cve_id": "",
+        "cvss_score": 3.7,
+        "mitre_attack": "T1021.004 - SSH",
+        "remediation": "Disable root SSH login, enforce public key authentication, and use Fail2ban or rate-limiting.",
         "ports": [22],
         "services": ["ssh"],
     },
     {
         "rule_id": "EXPOSED_DATABASE",
-        "name": "Database Service Detected",
-        "description": "Database services exposed to untrusted networks may allow unauthorized access.",
+        "name": "Database Service Exposed",
+        "description": "Direct database port exposure to untrusted networks may allow unauthorized data exfiltration.",
         "severity": "high",
-        "limitation": "The database may require authentication and be properly firewalled. "
-                      "Port presence alone does not confirm unauthorized access.",
-        "ports": [3306, 5432, 1433, 1521, 27017, 6379, 9200],
-        "services": ["mysql", "postgresql", "ms-sql-s", "oracle", "mongodb", "redis", "elasticsearch"],
+        "limitation": "Database may enforce strong authentication and SSL.",
+        "cve_id": "",
+        "cvss_score": 8.5,
+        "mitre_attack": "T1190 - Exploit Public-Facing Application",
+        "remediation": "Bind database to 127.0.0.1 or internal VPC only. Never expose database ports to public WAN.",
+        "ports": [3306, 5432, 1433, 1521],
+        "services": ["mysql", "postgresql", "ms-sql-s", "oracle"],
+    },
+    {
+        "rule_id": "EXPOSED_REDIS",
+        "name": "Redis In-Memory Store Exposed",
+        "description": "Redis instances often run without authentication by default, allowing remote attackers to write keys or achieve RCE.",
+        "severity": "critical",
+        "limitation": "The Redis instance may have requirepass configured.",
+        "cve_id": "CVE-2022-0543",
+        "cvss_score": 9.8,
+        "mitre_attack": "T1059 - Command and Scripting Interpreter",
+        "remediation": "Bind Redis to 127.0.0.1, enable protected-mode, set a strong requirepass in redis.conf.",
+        "ports": [6379],
+        "services": ["redis"],
+    },
+    {
+        "rule_id": "EXPOSED_MONGODB",
+        "name": "MongoDB Database Exposed",
+        "description": "MongoDB instance exposed to the network. Misconfigured instances may allow unauthorized read/write access.",
+        "severity": "high",
+        "limitation": "Authentication and TLS might be properly enabled.",
+        "cve_id": "",
+        "cvss_score": 8.2,
+        "mitre_attack": "T1190 - Exploit Public-Facing Application",
+        "remediation": "Enable authorization in mongod.conf, configure firewall rules, and avoid public exposure.",
+        "ports": [27017],
+        "services": ["mongodb"],
+    },
+    {
+        "rule_id": "EXPOSED_ELASTICSEARCH",
+        "name": "Elasticsearch Cluster API Exposed",
+        "description": "Elasticsearch REST API exposed. Without security features enabled, indices and clusters can be read or erased.",
+        "severity": "high",
+        "limitation": "Elasticsearch may have X-Pack / OpenSearch security enabled.",
+        "cve_id": "CVE-2015-1427",
+        "cvss_score": 8.6,
+        "mitre_attack": "T1190 - Exploit Public-Facing Application",
+        "remediation": "Enable Elasticsearch Security (TLS + basic auth) or restrict access through an API reverse proxy.",
+        "ports": [9200],
+        "services": ["elasticsearch"],
+    },
+    {
+        "rule_id": "EXPOSED_DOCKER_API",
+        "name": "Docker Daemon Unencrypted API Exposed",
+        "description": "Docker engine API (port 2375) without TLS grants root-equivalent control over the host system.",
+        "severity": "critical",
+        "limitation": "Port 2376 uses TLS certificates, while port 2375 is unencrypted.",
+        "cve_id": "",
+        "cvss_score": 9.8,
+        "mitre_attack": "T1611 - Escape to Host",
+        "remediation": "Never expose TCP port 2375. Use Unix socket or configure mutual TLS on port 2376.",
+        "ports": [2375, 2376],
+        "services": ["docker", "docker-ssl"],
+    },
+    {
+        "rule_id": "EXPOSED_KUBERNETES",
+        "name": "Kubernetes API Server Exposed",
+        "description": "Kubernetes API server port 6443 exposed. Targeted by attackers for cluster reconnaissance and takeover.",
+        "severity": "medium",
+        "limitation": "API server uses TLS and RBAC by default.",
+        "cve_id": "",
+        "cvss_score": 6.5,
+        "mitre_attack": "T1609 - Execution in Container",
+        "remediation": "Restrict API server access to administrative VPN IPs and ensure Anonymous Auth is disabled.",
+        "ports": [6443],
+        "services": ["kubernetes"],
     },
     {
         "rule_id": "EXPOSED_HTTP_MGMT",
         "name": "HTTP Management Interface Detected",
-        "description": "Web-based management interfaces (e.g., admin panels) may be exposed.",
+        "description": "Web-based administration panels or development servers may be exposed.",
         "severity": "medium",
-        "limitation": "The HTTP service may be a public website, not an admin panel. "
-                      "Content analysis is required to confirm.",
+        "limitation": "The HTTP service may be a normal public application.",
+        "cve_id": "",
+        "cvss_score": 5.0,
+        "mitre_attack": "T1190 - Exploit Public-Facing Application",
+        "remediation": "Verify authentication, enforce HTTPS, and restrict admin endpoints.",
         "ports": [8080, 8443, 9090, 8888, 10000],
         "services": [],
     },
     {
         "rule_id": "EXPOSED_SNMP",
         "name": "SNMP Service Detected",
-        "description": "SNMP (especially v1/v2c) uses community strings in cleartext. "
-                       "May leak system information.",
+        "description": "SNMP (v1/v2c) transmits community strings in plaintext and exposes network routing and OS information.",
         "severity": "medium",
-        "limitation": "SNMPv3 with authentication and encryption is considered secure. "
-                      "Version cannot be confirmed from port scan alone.",
+        "limitation": "SNMPv3 with authentication and AES encryption is secure.",
+        "cve_id": "",
+        "cvss_score": 5.8,
+        "mitre_attack": "T1046 - Network Service Discovery",
+        "remediation": "Migrate to SNMPv3 with authPriv, change default community strings ('public', 'private').",
         "ports": [161, 162],
         "services": ["snmp"],
     },
     {
         "rule_id": "EXPOSED_VNC",
-        "name": "VNC Service Detected",
-        "description": "VNC provides remote desktop access and may be targeted if exposed.",
+        "name": "VNC Remote Desktop Detected",
+        "description": "VNC provides remote desktop access and frequently suffers from weak passwords or unencrypted sessions.",
         "severity": "medium",
-        "limitation": "VNC may be tunneled through SSH/VPN. "
-                      "Authentication strength cannot be determined from a port scan.",
+        "limitation": "VNC may be tunneled through an encrypted SSH tunnel.",
+        "cve_id": "",
+        "cvss_score": 6.5,
+        "mitre_attack": "T1021.005 - VNC",
+        "remediation": "Tunnel VNC sessions through SSH or VPN and require multi-factor authentication.",
         "ports": [5900, 5901, 5902],
         "services": ["vnc"],
     },
     {
+        "rule_id": "EXPOSED_WINRM",
+        "name": "Windows Remote Management (WinRM) Exposed",
+        "description": "WinRM ports (5985 HTTP, 5986 HTTPS) allow remote PowerShell command execution.",
+        "severity": "medium",
+        "limitation": "WinRM uses Kerberos or NTLM authentication.",
+        "cve_id": "",
+        "cvss_score": 6.0,
+        "mitre_attack": "T1021.006 - Windows Remote Management",
+        "remediation": "Enforce HTTPS (port 5986), disable plaintext HTTP (port 5985), and restrict access via firewall.",
+        "ports": [5985, 5986],
+        "services": ["wsman"],
+    },
+    {
         "rule_id": "CLEARTEXT_PROTOCOL",
         "name": "Cleartext Protocol Detected",
-        "description": "Services using unencrypted protocols may expose sensitive data in transit.",
+        "description": "Services transmitting unencrypted communication allow eavesdropping and credential sniffing.",
         "severity": "low",
-        "limitation": "The service may be used only on trusted internal networks "
-                      "or wrapped in TLS/VPN tunnels.",
+        "limitation": "The service may be used only inside an isolated VLAN.",
+        "cve_id": "",
+        "cvss_score": 4.0,
+        "mitre_attack": "T1040 - Network Sniffing",
+        "remediation": "Migrate HTTP to HTTPS, POP3 to POP3S, IMAP to IMAPS, and disable TFTP.",
         "ports": [80, 110, 143, 25, 69],
         "services": ["http", "pop3", "imap", "smtp", "tftp"],
     },
@@ -166,18 +283,10 @@ DEFAULT_RULES: list[dict[str, Any]] = [
 class RiskEngine:
     """
     Evaluates scan results against configurable risk rules.
-
-    Rules are transparent: each finding includes the rule description,
-    evidence found, and explicit limitations of the detection.
+    Transparent, verifiable, and actionable.
     """
 
     def __init__(self, rules: list[dict[str, Any]] | None = None) -> None:
-        """
-        Initialize the risk engine.
-
-        Args:
-            rules: Optional list of rule dictionaries. Uses DEFAULT_RULES if None.
-        """
         self.rules: list[RiskRule] = []
         raw_rules = rules if rules is not None else DEFAULT_RULES
         for r in raw_rules:
@@ -188,22 +297,18 @@ class RiskEngine:
                 severity=r.get("severity", "info"),
                 limitation=r.get("limitation", ""),
                 enabled=r.get("enabled", True),
+                cve_id=r.get("cve_id", ""),
+                cvss_score=float(r.get("cvss_score", 0.0)),
+                mitre_attack=r.get("mitre_attack", ""),
+                remediation=r.get("remediation", ""),
                 ports=r.get("ports", []),
                 services=r.get("services", []),
                 products=r.get("products", []),
             ))
-        logger.info("Risk engine initialized with %d rules", len(self.rules))
+        logger.info("Risk engine v2.0 initialized with %d rules", len(self.rules))
 
     def analyze(self, scan_result: ScanResult) -> list[Finding]:
-        """
-        Analyze a scan result and return findings.
-
-        Args:
-            scan_result: The parsed scan data to analyze.
-
-        Returns:
-            List of findings sorted by severity.
-        """
+        """Analyze a scan result and return findings."""
         findings: list[Finding] = []
 
         for host in scan_result.hosts:
@@ -226,6 +331,10 @@ class RiskEngine:
                             port=port.port_id,
                             protocol=port.protocol,
                             service=port.service.display_name(),
+                            cve_id=rule.cve_id,
+                            cvss_score=rule.cvss_score,
+                            mitre_attack=rule.mitre_attack,
+                            remediation=rule.remediation,
                         ))
 
         findings.sort(key=lambda f: f.severity_order)
@@ -246,7 +355,7 @@ class RiskEngine:
         return port_match or service_match or product_match
 
     def _build_evidence(self, host: HostInfo, port: PortInfo) -> str:
-        """Build a human-readable evidence string."""
+        """Build human-readable evidence string."""
         parts = [
             f"Host: {host.ip_address}",
             f"Port: {port.port_id}/{port.protocol}",
@@ -258,6 +367,56 @@ class RiskEngine:
             parts.append(f"Reason: {port.reason}")
         return " | ".join(parts)
 
+    @staticmethod
+    def compute_security_posture(findings: list[Finding], total_hosts: int = 1) -> dict[str, Any]:
+        """
+        Calculate overall security score (0 - 100), letter grade, and posture metrics.
+        """
+        score = 100.0
+        deductions = {
+            "critical": 25.0,
+            "high": 12.0,
+            "medium": 5.0,
+            "low": 2.0,
+            "info": 0.5,
+        }
+
+        counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for f in findings:
+            sev = f.severity.lower()
+            if sev in counts:
+                counts[sev] += 1
+                score -= deductions.get(sev, 1.0)
+
+        score = max(0.0, min(100.0, round(score, 1)))
+
+        if score >= 90:
+            grade = "A+"
+            level = "Optimal Security Posture"
+        elif score >= 80:
+            grade = "A"
+            level = "Strong Security Posture"
+        elif score >= 70:
+            grade = "B"
+            level = "Moderate Risk"
+        elif score >= 55:
+            grade = "C"
+            level = "Elevated Risk"
+        elif score >= 40:
+            grade = "D"
+            level = "High Vulnerability Exposure"
+        else:
+            grade = "F"
+            level = "Critical Threat State"
+
+        return {
+            "score": score,
+            "grade": grade,
+            "level": level,
+            "counts": counts,
+            "remediation_actions": len([f for f in findings if f.remediation]),
+        }
+
     def get_rules_info(self) -> list[dict[str, Any]]:
         """Return rule metadata for display in the UI."""
         return [
@@ -268,6 +427,10 @@ class RiskEngine:
                 "severity": r.severity,
                 "limitation": r.limitation,
                 "enabled": r.enabled,
+                "cve_id": r.cve_id,
+                "cvss_score": r.cvss_score,
+                "mitre_attack": r.mitre_attack,
+                "remediation": r.remediation,
                 "ports": r.ports,
                 "services": r.services,
             }

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab v2.0 — CIDR & Subnet Calculator{% endblock %}
+{% block page_title %}🧮 CIDR & Subnet Calculator{% endblock %}
+
+{% block content %}
+<div class="grid-2-col">
+    <div class="card form-card">
+        <h3>Subnet Input & Scope Explorer</h3>
+        <p class="text-muted text-sm">
+            Enter any IPv4 or IPv6 CIDR prefix or IP address to calculate network boundaries, wildcard masks, and usable host scopes.
+        </p>
+
+        <form method="POST" action="{{ url_for('cidr_calc_view') }}" class="mt-3">
+            <div class="form-group">
+                <label for="cidr" class="form-label">CIDR Prefix / IP Address:</label>
+                <input
+                    type="text"
+                    id="cidr"
+                    name="cidr"
+                    class="form-control font-mono"
+                    placeholder="e.g. 192.168.1.0/24, 10.0.0.0/16, or 172.16.1.100/28"
+                    value="{{ cidr_input }}"
+                    required
+                >
+            </div>
+
+            <div class="quick-presets mt-2">
+                <span class="text-xs text-muted">Quick Presets:</span>
+                <button type="button" class="btn btn-outline btn-xs" onclick="setCIDR('192.168.1.0/24')">/24 Home/Office</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="setCIDR('10.0.0.0/16')">/16 Corporate</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="setCIDR('172.16.0.0/28')">/28 Lab Subnet</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="setCIDR('127.0.0.1/32')">/32 Host</button>
+            </div>
+
+            <div class="form-actions mt-4">
+                <button type="submit" class="btn btn-primary">Calculate Subnet</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        {% if details %}
+        <div class="details-header">
+            <h3>Network Scope: <span class="font-mono text-accent">{{ details.cidr }}</span></h3>
+            <span class="badge badge-info">{{ details.ip_scope }}</span>
+        </div>
+
+        <div class="meta-grid-table mt-3">
+            <div class="grid-row">
+                <span class="grid-key">Network Address:</span>
+                <span class="grid-val font-mono">{{ details.network_address }}</span>
+            </div>
+            <div class="grid-row">
+                <span class="grid-key">Broadcast Address:</span>
+                <span class="grid-val font-mono">{{ details.broadcast_address }}</span>
+            </div>
+            <div class="grid-row">
+                <span class="grid-key">Usable Host Range:</span>
+                <span class="grid-val font-mono text-success">{{ details.first_usable_ip }} &rarr; {{ details.last_usable_ip }}</span>
+            </div>
+            <div class="grid-row">
+                <span class="grid-key">Subnet Mask:</span>
+                <span class="grid-val font-mono">{{ details.netmask }}</span>
+            </div>
+            <div class="grid-row">
+                <span class="grid-key">Wildcard Mask:</span>
+                <span class="grid-val font-mono">{{ details.wildcard_mask }}</span>
+            </div>
+            <div class="grid-row">
+                <span class="grid-key">Total Addresses:</span>
+                <span class="grid-val font-semibold">{{ "{:,}".format(details.total_addresses) }}</span>
+            </div>
+            <div class="grid-row">
+                <span class="grid-key">Usable Hosts:</span>
+                <span class="grid-val font-semibold text-accent">{{ "{:,}".format(details.usable_hosts) }} hosts</span>
+            </div>
+            <div class="grid-row">
+                <span class="grid-key">Binary Netmask:</span>
+                <span class="grid-val font-mono text-xs text-muted">{{ details.binary_netmask }}</span>
+            </div>
+        </div>
+
+        <div class="subnet-actions mt-4">
+            <a href="{{ url_for('fast_scan_view') }}?target={{ details.cidr }}" class="btn btn-primary btn-sm">
+                ⚡ Launch Fast Scan on this Subnet
+            </a>
+            <a href="{{ url_for('live_scan') }}?target={{ details.cidr }}" class="btn btn-outline btn-sm">
+                🎯 Configure in Nmap Live Scanner
+            </a>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">🧮</div>
+            <h4>Enter a CIDR prefix to calculate network breakdown</h4>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function setCIDR(c) {
+    document.getElementById('cidr').value = c;
+}
+</script>
+{% endblock %}

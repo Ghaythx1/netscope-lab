@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab v2.0 — Web Security & Headers Recon{% endblock %}
+{% block page_title %}🌐 Web Security & Headers Recon{% endblock %}
+
+{% block content %}
+<div class="grid-2-col">
+    <div class="card form-card">
+        <h3>HTTP & TLS Endpoint Inspector</h3>
+        <p class="text-muted text-sm">
+            Audit web servers for missing security headers, software version leakage, and TLS protocol configurations.
+        </p>
+
+        <form method="POST" action="{{ url_for('web_recon_view') }}" class="mt-3">
+            <div class="form-row">
+                <div class="form-group col-half">
+                    <label for="host" class="form-label">Web Host / IP:</label>
+                    <input
+                        type="text"
+                        id="host"
+                        name="host"
+                        class="form-control font-mono"
+                        placeholder="e.g. 127.0.0.1 or example.com"
+                        value="{{ host_input }}"
+                        required
+                    >
+                </div>
+                <div class="form-group col-half">
+                    <label for="port" class="form-label">Port:</label>
+                    <input
+                        type="number"
+                        id="port"
+                        name="port"
+                        class="form-control font-mono"
+                        placeholder="80, 443, 8080"
+                        value="{{ port_input }}"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="quick-presets mt-2">
+                <span class="text-xs text-muted">Detected Web Ports in Current Scan:</span>
+                {% if detected_web_ports %}
+                    {% for item in detected_web_ports[:6] %}
+                    <button type="button" class="btn btn-outline btn-xs" onclick="setEndpoint('{{ item.host }}', {{ item.port }})">
+                        {{ item.host }}:{{ item.port }}
+                    </button>
+                    {% endfor %}
+                {% else %}
+                    <button type="button" class="btn btn-outline btn-xs" onclick="setEndpoint('127.0.0.1', 5000)">127.0.0.1:5000 (Local App)</button>
+                    <button type="button" class="btn btn-outline btn-xs" onclick="setEndpoint('scanme.nmap.org', 80)">scanme.nmap.org:80</button>
+                {% endif %}
+            </div>
+
+            <div class="form-actions mt-4">
+                <button type="submit" class="btn btn-primary">🔍 Inspect Web Security</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        {% if recon %}
+            <div class="recon-result-header">
+                <div>
+                    <h3 class="font-mono text-accent">{{ recon.url }}</h3>
+                    {% if recon.page_title %}
+                    <p class="text-sm text-muted">Title: "{{ recon.page_title }}"</p>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if recon.status_code %}
+                    <span class="badge {% if recon.status_code < 400 %}badge-success{% else %}badge-warning{% endif %}">
+                        HTTP {{ recon.status_code }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if recon.error_message %}
+            <div class="alert alert-warning mt-3">
+                <strong>Connection note:</strong> {{ recon.error_message }}
+            </div>
+            {% endif %}
+
+            <!-- Disclosures -->
+            <div class="disclosures-grid mt-3">
+                <div class="disc-box">
+                    <span class="disc-label">Server Header:</span>
+                    <span class="disc-val font-mono">{{ recon.server_banner or 'None (Secure / Hidden)' }}</span>
+                </div>
+                <div class="disc-box">
+                    <span class="disc-label">X-Powered-By:</span>
+                    <span class="disc-val font-mono">{{ recon.x_powered_by or 'None (Hidden)' }}</span>
+                </div>
+            </div>
+
+            <!-- Missing Headers -->
+            <h4 class="mt-4">Security Headers Evaluation:</h4>
+            <div class="headers-list mt-2">
+                {% for item in recon.missing_headers %}
+                <div class="header-item missing">
+                    <div class="header-meta">
+                        <span class="header-icon">❌</span>
+                        <div>
+                            <strong>{{ item.header }}</strong>
+                            <span class="severity-badge sev-{{ item.severity }} text-xs">{{ item.severity|upper }}</span>
+                            <p class="text-xs text-muted">{{ item.description }}</p>
+                        </div>
+                    </div>
+                    <div class="header-rec text-xs font-mono">Recommended: {{ item.recommended }}</div>
+                </div>
+                {% endfor %}
+
+                {% for k, v in recon.present_headers.items() %}
+                <div class="header-item present">
+                    <div class="header-meta">
+                        <span class="header-icon">✅</span>
+                        <div>
+                            <strong>{{ k }}</strong>
+                            <span class="badge badge-success text-xs">ENFORCED</span>
+                        </div>
+                    </div>
+                    <div class="header-rec text-xs font-mono text-muted">{{ v }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if recon.ssl_info %}
+            <h4 class="mt-4">TLS / SSL Protocol:</h4>
+            <div class="meta-grid-table mt-2">
+                {% for k, v in recon.ssl_info.items() %}
+                <div class="grid-row">
+                    <span class="grid-key">{{ k|replace('_', ' ')|title }}:</span>
+                    <span class="grid-val font-mono">{{ v }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">🌐</div>
+            <h4>Enter a host and web port to evaluate security headers and TLS</h4>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function setEndpoint(h, p) {
+    document.getElementById('host').value = h;
+    document.getElementById('port').value = p;
+}
+</script>
+{% endblock %}

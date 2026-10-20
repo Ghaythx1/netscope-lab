@@ -10,7 +10,7 @@ import json
 import logging
 import csv
 import io
-import html
+import html as html_lib
 from datetime import datetime
 from typing import Any
 
@@ -140,7 +140,7 @@ class ReportExporter:
             "low": "#3b82f6",
             "info": "#6b7280",
         }
-        esc = lambda value: html.escape(str(value), quote=True)
+        esc = lambda value: html_lib.escape(str(value), quote=True)
 
         findings_html = ""
         for f in findings:
@@ -259,3 +259,126 @@ class ReportExporter:
 </body>
 </html>"""
         return html
+
+    @staticmethod
+    def to_markdown(scan_result: ScanResult, findings: list[Finding], stats: dict[str, Any]) -> str:
+        """
+        Generate a comprehensive GitHub-flavored Markdown security assessment report.
+        """
+        from netscope_lab.analysis.risk_engine import RiskEngine
+        posture = RiskEngine.compute_security_posture(findings, len(scan_result.hosts))
+
+        lines = [
+            "# 🔬 NetScope Lab v2.0 — Security Assessment Report",
+            f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ",
+            f"**Scanner Engine:** {scan_result.metadata.scanner} ({scan_result.metadata.scanner_version or '2.0.0'})  ",
+            f"**Target Scope:** `{scan_result.metadata.command_line or 'Standard Assessment'}`  ",
+            "",
+            "---",
+            "",
+            "## 📊 Executive Posture & Scorecard",
+            f"- **Security Score:** `{posture['score']} / 100`",
+            f"- **Security Grade:** **{posture['grade']}** ({posture['level']})",
+            f"- **Total Discovered Hosts:** `{stats.get('total_hosts', len(scan_result.hosts))}`",
+            f"- **Total Open Ports:** `{stats.get('total_open_ports', 0)}`",
+            f"- **Total Identified Findings:** `{len(findings)}`",
+            "",
+            "| Severity | Count |",
+            "| :--- | :---: |",
+            f"| 🔴 Critical | {posture['counts']['critical']} |",
+            f"| 🟠 High | {posture['counts']['high']} |",
+            f"| 🟡 Medium | {posture['counts']['medium']} |",
+            f"| 🔵 Low | {posture['counts']['low']} |",
+            f"| ⚪ Info | {posture['counts']['info']} |",
+            "",
+            "---",
+            "",
+            "## 🚨 Findings & Risk Analysis",
+        ]
+
+        if not findings:
+            lines.append("No active security findings detected within scanned scope.")
+        else:
+            lines.append("| Severity | Rule / Threat | Target | CVE / MITRE | Actionable Remediation |")
+            lines.append("| :--- | :--- | :--- | :--- | :--- |")
+            for f in findings:
+                sev_icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵"}.get(f.severity.lower(), "⚪")
+                target = f"`{f.host_ip}:{f.port}`" if f.port else f"`{f.host_ip}`"
+                cve_mitre = []
+                if f.cve_id:
+                    cve_mitre.append(f"**{f.cve_id}**")
+                if f.mitre_attack:
+                    cve_mitre.append(f.mitre_attack)
+                cve_str = "<br>".join(cve_mitre) if cve_mitre else "Standard Rule"
+                remediation = f.remediation if f.remediation else "Review service exposure."
+                lines.append(f"| {sev_icon} {f.severity.upper()} | **{f.rule_name}** | {target} | {cve_str} | {remediation} |")
+
+        lines.extend([
+            "",
+            "---",
+            "",
+            "## 🖥️ Discovered Hosts & Network Attack Surface",
+        ])
+
+        if not scan_result.hosts:
+            lines.append("No responsive hosts reported in scan.")
+        else:
+            for host in scan_result.hosts:
+                host_title = host.ip_address
+                if host.hostnames:
+                    host_title += f" ({', '.join(host.hostnames)})"
+                lines.append(f"### Host: `{host_title}`")
+                lines.append(f"- **Status:** {host.status.upper()} ({host.status_reason or 'detected'})")
+                if host.mac_address:
+                    lines.append(f"- **MAC Address:** `{host.mac_address}` {f'({host.vendor})' if host.vendor else ''}")
+                if host.os_matches:
+                    lines.append(f"- **OS Fingerprint:** {', '.join(host.os_matches)}")
+
+                open_p = host.open_ports
+                if open_p:
+                    lines.append("")
+                    lines.append("| Port | Protocol | Service | Product / Banner |")
+                    lines.append("| :---: | :---: | :--- | :--- |")
+                    for p in open_p:
+                        prod = f"{p.service.product} {p.service.version}".strip() or "N/A"
+                        lines.append(f"| `{p.port_id}` | {p.protocol.upper()} | {p.service.name} | {prod} |")
+                else:
+                    lines.append("- *No open ports detected on this host.*")
+                lines.append("")
+
+        lines.extend([
+            "---",
+            "",
+            "> ⚠ **Disclaimer:** *This assessment was generated automatically by NetScope Lab v2.0 based on network probing and banner correlation. No exploit was executed.*",
+        ])
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def to_executive_summary(scan_result: ScanResult, findings: list[Finding], stats: dict[str, Any]) -> dict[str, Any]:
+        """
+        Generate executive-level summary and metrics for presentation.
+        """
+        from netscope_lab.analysis.risk_engine import RiskEngine
+        posture = RiskEngine.compute_security_posture(findings, len(scan_result.hosts))
+
+        critical_items = [
+            {
+                "rule_name": f.rule_name,
+                "host": f.host_ip,
+                "port": f.port,
+                "severity": f.severity,
+                "remediation": f.remediation,
+            }
+            for f in findings if f.severity.lower() in ("critical", "high")
+        ]
+
+        return {
+            "generated_at": datetime.now().isoformat(),
+            "posture": posture,
+            "total_hosts": len(scan_result.hosts),
+            "total_open_ports": stats.get("total_open_ports", 0),
+            "critical_risks": critical_items[:8],
+            "recommendation_count": len([f for f in findings if f.remediation]),
+        }
+
