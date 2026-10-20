@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab — Import{% endblock %}
+{% block page_title %}Import Scan Report{% endblock %}
+
+{% block content %}
+<div class="upload-page">
+    <div class="upload-card" id="upload-card">
+        <div class="upload-header">
+            <h2>Import Scan Data</h2>
+            <p>Upload an Nmap XML report (.xml) or a JSON scan report (.json).</p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="upload-form" id="upload-form">
+            <div class="file-drop-zone" id="drop-zone">
+                <div class="drop-icon">📁</div>
+                <p class="drop-text">Drag & drop your file here</p>
+                <p class="drop-subtext">or click to browse</p>
+                <input type="file" name="file" accept=".xml,.json" class="file-input" id="file-input">
+            </div>
+
+            <div class="upload-options">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="merge" id="merge-checkbox">
+                    <span class="checkbox-text">Merge with existing data (instead of replacing)</span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg" id="upload-btn">
+                Import File
+            </button>
+        </form>
+
+        <div class="upload-info">
+            <h3>Supported Formats</h3>
+            <ul class="format-list">
+                <li><span class="format-badge xml">XML</span> Nmap XML output (<code>nmap -oX</code>)</li>
+                <li><span class="format-badge json">JSON</span> Structured JSON scan reports</li>
+            </ul>
+            <div class="upload-limits">
+                <p>Maximum file size: 50 MB</p>
+                <p>Files are processed locally and never transmitted externally.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="sample-data-card">
+        <h3>Or Load Sample Data</h3>
+        <p>Try the application with bundled synthetic scan data.</p>
+        <div class="sample-buttons">
+            <a href="{{ url_for('load_sample', sample_type='xml') }}" class="btn btn-secondary" id="load-sample-xml">
+                Load XML Sample
+            </a>
+            <a href="{{ url_for('load_sample', sample_type='json') }}" class="btn btn-secondary" id="load-sample-json">
+                Load JSON Sample
+            </a>
+            <a href="{{ url_for('load_sample', sample_type='both') }}" class="btn btn-secondary" id="load-sample-both">
+                Load Both (Merged)
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,489 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab — Live Scanner{% endblock %}
+{% block page_title %}Live Scanner{% endblock %}
+
+{% block content %}
+<style>
+/* ---- Scan Page Styles ---- */
+.scan-warning {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.05));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-radius: var(--radius-md);
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 24px;
+    color: #fbbf24;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.scan-warning strong { color: #f59e0b; }
+
+.nmap-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+}
+.nmap-ok   { background: rgba(34,197,94,0.1); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+.nmap-miss { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+.nmap-dot  { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; animation: pulse-dot 1.5s infinite; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.scan-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 20px;
+}
+.scan-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-primary);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.target-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: end;
+}
+.scan-options-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-top:18px; }
+.scan-option-toggle { display:flex; align-items:flex-start; gap:9px; color:var(--text-secondary); font-size:.85rem; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--bg-surface); }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.03em;
+}
+.form-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    padding: 11px 16px;
+    width: 100%;
+    transition: var(--transition);
+    outline: none;
+}
+.form-input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(56,189,248,0.15);
+}
+.form-input::placeholder { color: var(--text-muted); font-size: 0.85rem; }
+.target-textarea { min-height:68px; resize:vertical; }
+.form-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.port-range-input { max-width: 280px; }
+
+.scan-types-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+}
+.scan-type-card {
+    position: relative;
+    cursor: pointer;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 18px;
+    background: var(--bg-surface);
+    transition: var(--transition);
+    display: block;
+}
+.scan-type-card:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-card-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+.scan-type-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0; height: 0;
+}
+.scan-type-card input[type="radio"]:checked ~ .stc-body {
+    /* handled via JS class toggle */
+}
+.scan-type-card.selected {
+    border-color: var(--accent-primary);
+    background: rgba(56,189,248,0.08);
+    box-shadow: 0 0 0 1px var(--accent-primary), var(--shadow-glow);
+}
+.stc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.stc-icon-box {
+    width: 40px; height: 40px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    background: var(--bg-card);
+}
+.stc-badges { display: flex; gap: 6px; align-items: center; }
+.badge-intensity {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 10px;
+}
+.badge-low    { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.badge-medium { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.badge-high   { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.badge-root   { background: rgba(239,68,68,0.1);   color: #f87171; font-size: 0.65rem; font-weight: 600; padding: 2px 7px; border-radius: 10px; border: 1px solid rgba(239,68,68,0.3); }
+
+.stc-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-heading);
+    margin-bottom: 6px;
+}
+.stc-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    margin-bottom: 10px;
+}
+.stc-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+.stc-time-icon { opacity: 0.7; }
+
+.scan-submit-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.btn-scan {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 36px;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+    letter-spacing: 0.04em;
+}
+.btn-scan:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(56,189,248,0.35);
+    background: linear-gradient(135deg, #7dd3fc, #a5b4fc);
+    color: #fff;
+}
+.btn-scan:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+.scan-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.scan-note code {
+    font-family: var(--font-mono);
+    color: var(--accent-secondary);
+    background: var(--bg-input);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.icon-target { font-size: 1.3rem; }
+</style>
+
+<div class="scan-warning">
+    <span style="font-size:1.4rem;flex-shrink:0;">⚠️</span>
+    <div>
+        <strong>Authorized Use Only:</strong> Only scan networks and systems you own or have explicit written permission to test.
+        Unauthorized scanning may violate local laws and regulations (e.g. Computer Misuse Act, CFAA).
+        NetScope Lab performs <em>live active scanning</em> — ensure you are on a trusted network.
+    </div>
+</div>
+
+{% if nmap_available %}
+<div class="nmap-status nmap-ok">
+    <span class="nmap-dot"></span>
+    nmap found: {{ nmap_path }}
+</div>
+{% else %}
+<div class="nmap-status nmap-miss">
+    <span>✗</span>
+    nmap not found — install with: <code style="margin-left:8px;font-family:monospace;color:#fca5a5">sudo apt install nmap</code>
+</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('live_scan') }}" id="scan-form">
+
+    <!-- === Target === -->
+    <div class="scan-section">
+        <div class="scan-section-title">Target</div>
+        <div class="target-row">
+            <div class="form-group" style="flex:1">
+                <label class="form-label" for="target">Targets — one per line or comma-separated</label>
+                <textarea id="target" name="target" class="form-input target-textarea"
+                       placeholder="192.168.1.1&#10;192.168.1.0/24&#10;server.example.local"
+                       required autocomplete="off" spellcheck="false"
+                       {% if not nmap_available %}disabled{% endif %}></textarea>
+                <label class="form-label" for="recent-targets">Recent targets</label>
+                <select id="recent-targets" class="form-input" aria-label="Choose a recently scanned target">
+                    <option value="">Choose a previously used target…</option>
+                </select>
+                <label class="form-label" for="recent-profiles">Repeat a previous scan</label>
+                <select id="recent-profiles" class="form-input" aria-label="Choose a previous scan configuration">
+                    <option value="">Choose a saved scan configuration…</option>
+                </select>
+                <div class="form-hint">
+                    Accepts IPs, CIDRs, Nmap ranges, hostnames, or lists of up to 256 targets.
+                </div>
+            </div>
+        </div>
+        <div class="scan-options-grid">
+            <div class="form-group">
+                <label class="form-label" for="port_mode">Port coverage</label>
+                <select id="port_mode" name="port_mode" class="form-input" {% if not nmap_available %}disabled{% endif %}>
+                    <option value="profile">Use scan profile defaults</option>
+                    <option value="top100">Top 100 common ports</option>
+                    <option value="top1000">Top 1,000 common ports</option>
+                    <option value="all">All ports (1–65535)</option>
+                    <option value="custom">Custom port range</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="port_range">Custom ports</label>
+                <input type="text" id="port_range" name="port_range" class="form-input"
+                       placeholder="e.g. 1-1024 or 22,80,443" autocomplete="off" spellcheck="false"
+                       {% if not nmap_available %}disabled{% endif %} />
+                <div class="form-hint">Used by custom mode, or to override a profile's defaults.</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="timing">Timing profile</label>
+                <select id="timing" name="timing" class="form-input" {% if not nmap_available %}disabled{% endif %}>
+                    <option value="2">Careful — T2, slower and gentler</option>
+                    <option value="3" selected>Balanced — T3</option>
+                    <option value="4">Fast — T4, best on reliable networks</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="timeout_minutes">Maximum scan duration</label>
+                <select id="timeout_minutes" name="timeout_minutes" class="form-input" {% if not nmap_available %}disabled{% endif %}>
+                    <option value="30" selected>30 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="120">2 hours</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="exclude">Exclude one host or range</label>
+                <input type="text" id="exclude" name="exclude" class="form-input"
+                       placeholder="e.g. 192.168.1.1 or 192.168.1.0/28"
+                       {% if not nmap_available %}disabled{% endif %} />
+            </div>
+        </div>
+        <div class="scan-options-grid">
+            <label class="scan-option-toggle"><input type="checkbox" name="skip_discovery" id="skip_discovery"> Skip host discovery (-Pn)</label>
+            <label class="scan-option-toggle"><input type="checkbox" name="disable_dns" id="disable_dns"> Skip reverse DNS lookups for speed (-n)</label>
+        </div>
+        <div class="scan-options-grid">
+            <div class="form-group">
+                <label class="form-label" for="version_intensity">Service/version detection</label>
+                <select id="version_intensity" name="version_intensity" class="form-input" {% if not nmap_available %}disabled{% endif %}>
+                    <option value="default">Profile default</option>
+                    <option value="light">Light probes</option>
+                    <option value="intensive">All version probes (slower)</option>
+                </select>
+                <div class="form-hint">Enables service detection for profiles that do not already include it.</div>
+            </div>
+            <label class="scan-option-toggle"><input type="checkbox" name="os_detection" id="os_detection"> Detect operating system (may need root)</label>
+            <label class="scan-option-toggle"><input type="checkbox" name="traceroute" id="traceroute"> Trace network route to targets</label>
+            <label class="scan-option-toggle"><input type="checkbox" name="safe_scripts" id="safe_scripts"> Run Nmap's safe NSE scripts</label>
+        </div>
+    </div>
+
+    <!-- === Scan Type === -->
+    <div class="scan-section">
+        <div class="scan-section-title">Scan Type</div>
+        <div class="scan-types-grid">
+            {% set icons = {
+                'ping':       '📡',
+                'quick':      '⚡',
+                'syn':        '🕵',
+                'service':    '🔍',
+                'full':       '🔬',
+                'aggressive': '💥',
+                'vuln':       '🛡',
+                'udp':        '📶',
+                'tcp_connect': '🔌',
+                'all_tcp': '🧭',
+                'tcp_udp': '🌐'
+            } %}
+            {% for key, cfg in scan_types.items() %}
+            <label class="scan-type-card {% if key == 'quick' %}selected{% endif %}" for="st-{{ key }}" id="card-{{ key }}">
+                <input type="radio" name="scan_type" id="st-{{ key }}" value="{{ key }}"
+                       {% if key == 'quick' %}checked{% endif %}
+                       {% if not nmap_available %}disabled{% endif %} />
+                <div class="stc-header">
+                    <div class="stc-icon-box">{{ icons.get(key, '🔧') }}</div>
+                    <div class="stc-badges">
+                        <span class="badge-intensity badge-{{ cfg.intensity }}">{{ cfg.intensity }}</span>
+                        {% if cfg.requires_root %}
+                        <span class="badge-root">sudo</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="stc-name">{{ cfg.name }}</div>
+                <div class="stc-desc">{{ cfg.description }}</div>
+                <div class="stc-footer">
+                    <span class="stc-time-icon">⏱</span>
+                    {{ cfg.estimated_time }}
+                </div>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- === Submit === -->
+    <div class="scan-submit-row">
+        <button type="submit" class="btn-scan" id="scan-submit-btn"
+                {% if not nmap_available %}disabled{% endif %}>
+            <span>🚀</span>
+            <span>Start Scan</span>
+        </button>
+        <div class="scan-note">
+            Root scans (SYN, Full, etc.) require running with <code>sudo python run.py</code>
+        </div>
+    </div>
+
+</form>
+
+<script>
+const recentTargetsKey = 'netscope.recentTargets';
+const recentProfilesKey = 'netscope.recentProfiles';
+const targetInput = document.getElementById('target');
+const recentTargets = document.getElementById('recent-targets');
+const recentProfiles = document.getElementById('recent-profiles');
+const portMode = document.getElementById('port_mode');
+const portRange = document.getElementById('port_range');
+function updatePortRequirement() { portRange.required = portMode.value === 'custom'; }
+portMode.addEventListener('change', updatePortRequirement);
+updatePortRequirement();
+try {
+    JSON.parse(localStorage.getItem(recentTargetsKey) || '[]').forEach(target => {
+        const option = document.createElement('option');
+        option.value = target;
+        option.textContent = target;
+        recentTargets.appendChild(option);
+    });
+} catch (_) {}
+try {
+    JSON.parse(localStorage.getItem(recentProfilesKey) || '[]').forEach((profile, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = `${profile.target} — ${profile.scan_type} — ${profile.port_range || profile.port_mode || 'profile'} — T${profile.timing || 3}`;
+        recentProfiles.appendChild(option);
+    });
+} catch (_) {}
+recentTargets.addEventListener('change', () => {
+    if (recentTargets.value) targetInput.value = recentTargets.value;
+});
+recentProfiles.addEventListener('change', () => {
+    if (!recentProfiles.value) return;
+    try {
+        const profile = JSON.parse(localStorage.getItem(recentProfilesKey) || '[]')[Number(recentProfiles.value)];
+        if (!profile) return;
+        targetInput.value = profile.target;
+        document.getElementById('port_range').value = profile.port_range || '';
+        document.getElementById('port_mode').value = profile.port_mode || 'profile';
+        document.getElementById('timing').value = profile.timing || '3';
+        document.getElementById('timeout_minutes').value = profile.timeout_minutes || '30';
+        document.getElementById('exclude').value = profile.exclude || '';
+        document.getElementById('skip_discovery').checked = !!profile.skip_discovery;
+        document.getElementById('disable_dns').checked = !!profile.disable_dns;
+        document.getElementById('version_intensity').value = profile.version_intensity || 'default';
+        document.getElementById('os_detection').checked = !!profile.os_detection;
+        document.getElementById('traceroute').checked = !!profile.traceroute;
+        document.getElementById('safe_scripts').checked = !!profile.safe_scripts;
+        const radio = document.querySelector(`input[name="scan_type"][value="${profile.scan_type}"]`);
+        if (radio) {
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change'));
+        }
+    } catch (_) {}
+});
+
+// Highlight selected card
+document.querySelectorAll('input[name="scan_type"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        document.querySelectorAll('.scan-type-card').forEach(c => c.classList.remove('selected'));
+        radio.closest('.scan-type-card').classList.add('selected');
+    });
+});
+
+// Prevent double-submit
+document.getElementById('scan-form').addEventListener('submit', function() {
+    const value = targetInput.value.trim();
+    if (value) {
+        try {
+            const history = JSON.parse(localStorage.getItem(recentTargetsKey) || '[]');
+            const updated = [value, ...history.filter(item => item !== value)].slice(0, 12);
+            localStorage.setItem(recentTargetsKey, JSON.stringify(updated));
+            const profile = {
+                target: value,
+                scan_type: document.querySelector('input[name="scan_type"]:checked')?.value || 'quick',
+                port_range: document.getElementById('port_range').value.trim(),
+                port_mode: document.getElementById('port_mode').value,
+                timing: document.getElementById('timing').value,
+                timeout_minutes: document.getElementById('timeout_minutes').value,
+                exclude: document.getElementById('exclude').value.trim(),
+                skip_discovery: document.getElementById('skip_discovery').checked,
+                disable_dns: document.getElementById('disable_dns').checked,
+                version_intensity: document.getElementById('version_intensity').value,
+                os_detection: document.getElementById('os_detection').checked,
+                traceroute: document.getElementById('traceroute').checked,
+                safe_scripts: document.getElementById('safe_scripts').checked
+            };
+            const profiles = JSON.parse(localStorage.getItem(recentProfilesKey) || '[]');
+            const updatedProfiles = [profile, ...profiles.filter(item =>
+                JSON.stringify(item) !== JSON.stringify(profile)
+            )].slice(0, 12);
+            localStorage.setItem(recentProfilesKey, JSON.stringify(updatedProfiles));
+        } catch (_) {}
+    }
+    const btn = document.getElementById('scan-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span><span>Launching scan...</span>';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab — Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+{% if has_data %}
+<div class="stats-grid">
+    <div class="stat-card stat-primary" id="stat-hosts">
+        <div class="stat-icon">🖥️</div>
+        <div class="stat-value" id="stat-hosts-value">{{ stats.total_hosts }}</div>
+        <div class="stat-label">Total Hosts</div>
+        <div class="stat-detail">{{ stats.hosts_up }} up / {{ stats.hosts_down }} down</div>
+    </div>
+    <div class="stat-card stat-success" id="stat-ports">
+        <div class="stat-icon">🔓</div>
+        <div class="stat-value" id="stat-ports-value">{{ stats.total_open_ports }}</div>
+        <div class="stat-label">Open Ports</div>
+        <div class="stat-detail">{{ stats.total_closed_ports }} closed / {{ stats.total_filtered_ports }} filtered</div>
+    </div>
+    <div class="stat-card stat-info" id="stat-services">
+        <div class="stat-icon">⚙️</div>
+        <div class="stat-value" id="stat-services-value">{{ stats.unique_services }}</div>
+        <div class="stat-label">Unique Services</div>
+        <div class="stat-detail">Detected across all hosts</div>
+    </div>
+    <div class="stat-card stat-warning" id="stat-findings">
+        <div class="stat-icon">🔍</div>
+        <div class="stat-value" id="stat-findings-value">{{ findings|length }}</div>
+        <div class="stat-label">Findings</div>
+        <div class="stat-detail">
+            {{ findings|selectattr('severity', 'equalto', 'high')|list|length }} high /
+            {{ findings|selectattr('severity', 'equalto', 'medium')|list|length }} medium
+        </div>
+    </div>
+</div>
+
+{% if stats.total_warnings > 0 %}
+<div class="alert alert-warning">
+    <span class="alert-icon">⚠️</span>
+    <strong>{{ stats.total_warnings }} parsing warning(s)</strong> detected. Check the import page for details.
+</div>
+{% endif %}
+
+<div class="charts-grid">
+    <div class="chart-card" id="chart-ports-card">
+        <h3 class="chart-title">Top Open Ports</h3>
+        <div class="chart-container" id="ports-chart">
+            {% for item in stats.top_ports %}
+            <div class="bar-row">
+                <span class="bar-label">Port {{ item.port }}</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width: {{ (item.count / stats.top_ports[0].count * 100) if stats.top_ports else 0 }}%"></div>
+                </div>
+                <span class="bar-value">{{ item.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="chart-card" id="chart-services-card">
+        <h3 class="chart-title">Service Distribution</h3>
+        <div class="chart-container" id="services-chart">
+            {% for item in stats.top_services %}
+            <div class="bar-row">
+                <span class="bar-label">{{ item.service }}</span>
+                <div class="bar-track">
+                    <div class="bar-fill bar-fill-alt" style="width: {{ (item.count / stats.top_services[0].count * 100) if stats.top_services else 0 }}%"></div>
+                </div>
+                <span class="bar-value">{{ item.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if findings %}
+<div class="section">
+    <h2 class="section-title">Recent Findings</h2>
+    <div class="findings-preview">
+        {% for finding in findings[:5] %}
+        <div class="finding-card finding-{{ finding.severity }}" id="finding-preview-{{ loop.index }}">
+            <div class="finding-header">
+                <span class="severity-badge severity-{{ finding.severity }}">{{ finding.severity|upper }}</span>
+                <span class="finding-name">{{ finding.rule_name }}</span>
+            </div>
+            <p class="finding-evidence">{{ finding.evidence }}</p>
+        </div>
+        {% endfor %}
+        {% if findings|length > 5 %}
+        <a href="{{ url_for('findings') }}" class="view-all-link">View all {{ findings|length }} findings →</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<div class="section">
+    <h2 class="section-title">Current Scan</h2>
+    <p class="section-subtitle">{{ scan.metadata.summary or ('Results from ' ~ (scan.metadata.source_file or scan.metadata.source_format or 'Nmap scan')) }}</p>
+    <div class="metadata-grid">
+        <div class="metadata-item">
+            <span class="meta-label">Scanner</span>
+            <span class="meta-value">{{ scan.metadata.scanner }} {{ scan.metadata.scanner_version }}</span>
+        </div>
+        <div class="metadata-item">
+            <span class="meta-label">Scan Type</span>
+            <span class="meta-value">{{ scan.metadata.scan_type or 'N/A' }}</span>
+        </div>
+        <div class="metadata-item">
+            <span class="meta-label">Start Time</span>
+            <span class="meta-value">{{ scan.metadata.start_time or 'N/A' }}</span>
+        </div>
+        <div class="metadata-item">
+            <span class="meta-label">Source File</span>
+            <span class="meta-value">{{ scan.metadata.source_file or 'N/A' }}</span>
+        </div>
+        <div class="metadata-item">
+            <span class="meta-label">Duration</span>
+            <span class="meta-value">{{ scan.metadata.elapsed_seconds }}s</span>
+        </div>
+        <div class="metadata-item">
+            <span class="meta-label">Format</span>
+            <span class="meta-value">{{ scan.metadata.source_format|upper }}</span>
+        </div>
+        {% if scan.metadata.command_line %}
+        <div class="metadata-item">
+            <span class="meta-label">Scan Options</span>
+            <span class="meta-value">{{ scan.metadata.command_line }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📡</div>
+    <h2>No Scan Data Loaded</h2>
+    <p>Start an authorized Nmap scan to discover hosts, open ports, and services. Results will appear here automatically.</p>
+    <div class="empty-actions">
+        <a href="{{ url_for('live_scan') }}" class="btn btn-primary" id="btn-start-scan">Start a Live Scan</a>
+        <a href="{{ url_for('upload') }}" class="btn btn-secondary" id="btn-import">Import Report</a>
+        <a href="{{ url_for('load_sample', sample_type='xml') }}" class="btn btn-secondary" id="btn-sample">Load Sample Data</a>
+        <a href="{{ url_for('scan_history') }}" class="btn btn-secondary">View Scan History</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

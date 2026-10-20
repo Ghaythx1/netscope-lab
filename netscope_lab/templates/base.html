@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="NetScope Lab - Cybersecurity Scan Analysis Dashboard">
+    <title>{% block title %}NetScope Lab{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <span class="brand-icon">🔬</span>
+            <span class="brand-text">NetScope Lab</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+                <span class="nav-icon">📊</span>Dashboard
+            </a></li>
+            <li><a href="{{ url_for('hosts') }}" class="nav-link {% if request.endpoint in ['hosts', 'host_detail'] %}active{% endif %}" id="nav-hosts">
+                <span class="nav-icon">🖥️</span>Hosts
+            </a></li>
+            <li><a href="{{ url_for('findings') }}" class="nav-link {% if request.endpoint == 'findings' %}active{% endif %}" id="nav-findings">
+                <span class="nav-icon">🔍</span>Findings
+            </a></li>
+            <li><a href="{{ url_for('live_scan') }}" class="nav-link {% if request.endpoint in ['live_scan', 'scan_status_page'] %}active{% endif %}" id="nav-scan">
+                <span class="nav-icon">🎯</span>Live Scan
+            </a></li>
+            <li><a href="{{ url_for('upload') }}" class="nav-link {% if request.endpoint == 'upload' %}active{% endif %}" id="nav-upload">
+                <span class="nav-icon">📁</span>Import
+            </a></li>
+            <li><a href="{{ url_for('reports') }}" class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}" id="nav-reports">
+                <span class="nav-icon">📋</span>Reports
+            </a></li>
+            <li><a href="{{ url_for('scan_history') }}" class="nav-link {% if request.endpoint in ['scan_history', 'load_historical_scan'] %}active{% endif %}" id="nav-history">
+                <span class="nav-icon">🕘</span>Scan History
+            </a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span class="version-badge">v1.0.0</span>
+            <span class="footer-note">Local Network Scanner</span>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">☰</button>
+            <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+            <div class="top-bar-actions">
+                {% if has_data is defined and has_data %}
+                <span class="status-badge online">Data Loaded</span>
+                {% else %}
+                <span class="status-badge offline">No Data</span>
+                {% endif %}
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-container">
+            {% for category, message in messages %}
+            <div class="flash flash-{{ category }}" role="alert">
+                <span class="flash-icon">
+                    {% if category == 'success' %}✅{% elif category == 'error' %}❌{% else %}ℹ️{% endif %}
+                </span>
+                {{ message }}
+                <button class="flash-close" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <div class="content-area">
+            {% if error is defined and error %}
+            <div class="empty-state">
+                <div class="empty-icon">⚠️</div>
+                <h2>{{ error }}</h2>
+            </div>
+            {% else %}
+            {% block content %}{% endblock %}
+            {% endif %}
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

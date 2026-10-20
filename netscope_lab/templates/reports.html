@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab — Reports{% endblock %}
+{% block page_title %}Export Reports{% endblock %}
+
+{% block content %}
+{% if has_data %}
+<div class="reports-page">
+    <div class="export-card" id="export-html">
+        <div class="export-icon">📄</div>
+        <h3>HTML Report</h3>
+        <p>Download a standalone, styled HTML report with all hosts, ports, findings, and statistics.
+           Suitable for sharing and archiving.</p>
+        <a href="{{ url_for('export_report', format_type='html') }}" class="btn btn-primary" id="btn-export-html">
+            Download HTML Report
+        </a>
+    </div>
+
+    <div class="export-card" id="export-json">
+        <div class="export-icon">📋</div>
+        <h3>JSON Report</h3>
+        <p>Download a structured JSON report for programmatic processing, integration with other tools,
+           or data archival.</p>
+        <a href="{{ url_for('export_report', format_type='json') }}" class="btn btn-primary" id="btn-export-json">
+            Download JSON Report
+        </a>
+    </div>
+
+    <div class="export-card" id="export-csv">
+        <div class="export-icon">📊</div>
+        <h3>CSV Spreadsheet</h3>
+        <p>Export a clean, filterable port and service inventory for spreadsheet review and asset tracking.</p>
+        <a href="{{ url_for('export_report', format_type='csv') }}" class="btn btn-primary" id="btn-export-csv">
+            Download CSV Inventory
+        </a>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📋</div>
+    <h2>No Data to Export</h2>
+    <p>Import a scan report first to generate exportable reports.</p>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">Import Report</a>
+</div>
+{% endif %}
+{% endblock %}

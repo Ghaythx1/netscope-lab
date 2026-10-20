@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}NetScope Lab — Scan Comparison{% endblock %}
+{% block page_title %}Scan Comparison{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">Changes Between Scans</h2>
+    <p class="section-subtitle">Earlier: {{ older.import_timestamp[:19].replace('T', ' ') }} · {{ older.metadata.source_file or older.metadata.scan_type or 'scan' }}<br>
+    Later: {{ newer.import_timestamp[:19].replace('T', ' ') }} · {{ newer.metadata.source_file or newer.metadata.scan_type or 'scan' }}</p>
+    <div class="stats-grid">
+        <div class="stat-card stat-primary"><div class="stat-value">{{ added_hosts|length }}</div><div class="stat-label">Newly Seen Hosts</div></div>
+        <div class="stat-card stat-warning"><div class="stat-value">{{ missing_hosts|length }}</div><div class="stat-label">Not Seen in Later Scan</div></div>
+        <div class="stat-card stat-success"><div class="stat-value">{{ newly_open|length }}</div><div class="stat-label">Newly Open Ports</div></div>
+        <div class="stat-card stat-info"><div class="stat-value">{{ no_longer_open|length }}</div><div class="stat-label">No Longer Reported Open</div></div>
+        <div class="stat-card stat-warning"><div class="stat-value">{{ service_changes|length }}</div><div class="stat-label">Service Changes</div></div>
+    </div>
+    <div class="alert alert-warning" style="margin-top:18px"><span class="alert-icon">ℹ️</span>Port differences depend on scan coverage and scan type. “Not reported open” does not prove a service was removed.</div>
+    {% for title, items, is_port in [
+        ('Newly seen hosts', added_hosts, false),
+        ('Hosts not seen in later scan', missing_hosts, false),
+        ('Ports newly reported open', newly_open, true),
+        ('Ports no longer reported open', no_longer_open, true)
+    ] %}
+    <div class="section" style="margin-top:22px">
+        <h3 class="section-title">{{ title }}</h3>
+        {% if items %}
+        <div class="table-container"><table class="data-table"><thead><tr><th>Host</th>{% if is_port %}<th>Port</th><th>Protocol</th><th>Service</th>{% endif %}</tr></thead><tbody>
+        {% for item in items %}<tr><td>{{ item[0] if is_port else item }}</td>{% if is_port %}<td>{{ item[1] }}</td><td>{{ item[2] }}</td><td>{{ item[3] }}</td>{% endif %}</tr>{% endfor %}
+        </tbody></table></div>
+        {% else %}<p class="section-subtitle">No changes in this category.</p>{% endif %}
+    </div>
+    {% endfor %}
+    <div class="section" style="margin-top:22px">
+        <h3 class="section-title">Service or version changes</h3>
+        {% if service_changes %}
+        <div class="table-container"><table class="data-table"><thead><tr><th>Host</th><th>Port</th><th>Previous detection</th><th>Latest detection</th></tr></thead><tbody>
+        {% for item in service_changes %}<tr><td>{{ item[0] }}</td><td>{{ item[1] }}/{{ item[2] }}</td><td>{{ item[3] }}</td><td>{{ item[4] }}</td></tr>{% endfor %}
+        </tbody></table></div>
+        {% else %}<p class="section-subtitle">No service identification changes.</p>{% endif %}
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('scan_history') }}">Back to scan history</a>
+</section>
+{% endblock %}

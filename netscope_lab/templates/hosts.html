@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab — Hosts{% endblock %}
+{% block page_title %}Hosts{% endblock %}
+
+{% block content %}
+{% if has_data %}
+<div class="filter-bar" id="host-filters">
+    <form method="get" class="filter-form">
+        <div class="search-group">
+            <input type="text" name="search" value="{{ search }}" placeholder="Search IP, hostname, MAC, manufacturer..."
+                   class="search-input" id="host-search" autocomplete="off">
+            <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label">Status:</label>
+            <select name="state" class="filter-select" id="host-state-filter" onchange="this.form.submit()">
+                <option value="all" {% if state_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="up" {% if state_filter == 'up' %}selected{% endif %}>Up</option>
+                <option value="down" {% if state_filter == 'down' %}selected{% endif %}>Down</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+{% if hosts %}
+<div class="table-container">
+    <table class="data-table" id="hosts-table">
+        <thead>
+            <tr>
+                <th>IP Address</th>
+                <th>Hostname</th>
+                <th>MAC Address</th>
+                <th>Manufacturer</th>
+                <th>Status</th>
+                <th>Open Ports</th>
+                <th>Services</th>
+                <th>OS</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for host in hosts %}
+            <tr class="host-row" id="host-{{ host.ip_address | replace('.', '-') }}">
+                <td class="ip-cell">
+                    <a href="{{ url_for('host_detail', host_ip=host.ip_address) }}" class="ip-link">{{ host.ip_address }}</a>
+                </td>
+                <td>{{ host.hostnames|join(', ') or '—' }}</td>
+                <td class="mono-cell">{{ host.mac_address or '—' }}</td>
+                <td>{{ host.vendor or 'Unknown' }}</td>
+                <td>
+                    <span class="status-dot status-{{ host.status }}"></span>
+                    {{ host.status }}
+                </td>
+                <td>
+                    <span class="port-count">{{ host.open_ports|length }}</span>
+                </td>
+                <td class="services-cell">
+                    {% for svc in host.services[:3] %}
+                    <span class="service-tag">{{ svc.name }}</span>
+                    {% endfor %}
+                    {% if host.services|length > 3 %}
+                    <span class="service-more">+{{ host.services|length - 3 }}</span>
+                    {% endif %}
+                </td>
+                <td class="os-cell">{{ host.os_matches[0] if host.os_matches else '—' }}</td>
+                <td>
+                    <a href="{{ url_for('host_detail', host_ip=host.ip_address) }}" class="btn btn-ghost btn-sm">Inspect</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="table-info">Showing {{ hosts|length }} host(s)</p>
+{% else %}
+<div class="empty-state empty-state-sm">
+    <div class="empty-icon">🔎</div>
+    <h3>No hosts match your search</h3>
+    <p>Try adjusting your search or filters.</p>
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">🖥️</div>
+    <h2>No Data Available</h2>
+    <p>Import a scan report to view hosts.</p>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">Import Report</a>
+</div>
+{% endif %}
+{% endblock %}

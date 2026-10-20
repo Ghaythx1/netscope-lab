@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab — Findings{% endblock %}
+{% block page_title %}Findings{% endblock %}
+
+{% block content %}
+<div class="disclaimer-banner">
+    <span class="disclaimer-icon">ℹ️</span>
+    <p>Findings are based on port and service detection only. They indicate conditions that <strong>may</strong> warrant
+    further investigation. No vulnerability is confirmed merely because a port is open or a service is detected.</p>
+</div>
+
+{% if has_data %}
+<div class="filter-bar">
+    <form method="get" class="filter-form">
+        <div class="filter-group">
+            <label class="filter-label">Severity:</label>
+            <select name="severity" class="filter-select" id="severity-filter" onchange="this.form.submit()">
+                <option value="all" {% if severity_filter == 'all' %}selected{% endif %}>All Severities</option>
+                <option value="high" {% if severity_filter == 'high' %}selected{% endif %}>High</option>
+                <option value="medium" {% if severity_filter == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="low" {% if severity_filter == 'low' %}selected{% endif %}>Low</option>
+                <option value="info" {% if severity_filter == 'info' %}selected{% endif %}>Info</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+{% if findings %}
+<div class="findings-list">
+    {% for finding in findings %}
+    <div class="finding-card finding-{{ finding.severity }}" id="finding-{{ loop.index }}">
+        <div class="finding-header">
+            <span class="severity-badge severity-{{ finding.severity }}">{{ finding.severity|upper }}</span>
+            <span class="finding-name">{{ finding.rule_name }}</span>
+            <span class="finding-rule-id">{{ finding.rule_id }}</span>
+        </div>
+        <p class="finding-description">{{ finding.description }}</p>
+        <div class="finding-details">
+            <div class="finding-detail">
+                <strong>Host:</strong>
+                <a href="{{ url_for('host_detail', host_ip=finding.host_ip) }}">{{ finding.host_ip }}</a>
+                — Port {{ finding.port }}/{{ finding.protocol }}
+            </div>
+            <div class="finding-detail">
+                <strong>Service:</strong> {{ finding.service }}
+            </div>
+            <div class="finding-detail">
+                <strong>Evidence:</strong> {{ finding.evidence }}
+            </div>
+            <div class="finding-detail finding-limitation">
+                <strong>⚠ Limitation:</strong> {{ finding.limitation }}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<p class="table-info">Showing {{ findings|length }} finding(s)</p>
+{% else %}
+<div class="empty-state empty-state-sm">
+    <div class="empty-icon">✅</div>
+    <h3>No Findings</h3>
+    <p>No findings match the selected severity filter.</p>
+</div>
+{% endif %}
+
+<div class="section" id="rules-reference">
+    <h2 class="section-title">Rule Reference</h2>
+    <p class="section-subtitle">All configured risk detection rules and their criteria.</p>
+    <div class="rules-grid">
+        {% for rule in rules_info %}
+        <div class="rule-card {% if rule.enabled %}rule-enabled{% else %}rule-disabled{% endif %}">
+            <div class="rule-header">
+                <span class="severity-badge severity-{{ rule.severity }}">{{ rule.severity|upper }}</span>
+                <span class="rule-name">{{ rule.name }}</span>
+                {% if not rule.enabled %}<span class="rule-status-tag">Disabled</span>{% endif %}
+            </div>
+            <p class="rule-description">{{ rule.description }}</p>
+            <div class="rule-criteria">
+                {% if rule.ports %}
+                <span class="criteria-tag">Ports: {{ rule.ports|join(', ') }}</span>
+                {% endif %}
+                {% if rule.services %}
+                <span class="criteria-tag">Services: {{ rule.services|join(', ') }}</span>
+                {% endif %}
+            </div>
+            <p class="rule-limitation"><strong>Limitation:</strong> {{ rule.limitation }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">🔍</div>
+    <h2>No Data Available</h2>
+    <p>Import a scan report to analyze findings.</p>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">Import Report</a>
+</div>
+{% endif %}
+{% endblock %}

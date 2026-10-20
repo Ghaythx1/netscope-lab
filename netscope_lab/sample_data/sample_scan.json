@@ -1,0 +1,240 @@
+{
+  "scan_info": {
+    "scanner": "nmap",
+    "version": "7.94",
+    "scan_type": "syn",
+    "command_line": "nmap -sV -p 1-1024 10.0.0.0/24",
+    "start_time": "2024-10-18 14:30:00",
+    "end_time": "2024-10-18 14:35:00",
+    "elapsed": 300,
+    "summary": "Scan completed: 4 hosts up"
+  },
+  "hosts": [
+    {
+      "ip": "10.0.0.1",
+      "hostnames": ["router.corp.local"],
+      "status": "up",
+      "mac_address": "00:11:22:33:44:55",
+      "vendor": "Juniper",
+      "os_matches": ["Junos 21.4"],
+      "ports": [
+        {
+          "port_id": 22,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "ssh",
+            "product": "OpenSSH",
+            "version": "8.6",
+            "confidence": 10
+          }
+        },
+        {
+          "port_id": 443,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "https",
+            "product": "Juniper WebUI",
+            "version": "",
+            "confidence": 8
+          }
+        },
+        {
+          "port_id": 161,
+          "protocol": "udp",
+          "state": "open",
+          "reason": "udp-response",
+          "service": {
+            "name": "snmp",
+            "product": "net-snmp",
+            "version": "5.9",
+            "confidence": 10
+          }
+        }
+      ]
+    },
+    {
+      "ip": "10.0.0.10",
+      "hostnames": ["mailserver.corp.local"],
+      "status": "up",
+      "os_matches": ["Ubuntu 22.04"],
+      "ports": [
+        {
+          "port_id": 25,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "smtp",
+            "product": "Postfix",
+            "version": "3.7.4",
+            "confidence": 10
+          }
+        },
+        {
+          "port_id": 110,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "pop3",
+            "product": "Dovecot",
+            "version": "2.3.20",
+            "confidence": 10
+          }
+        },
+        {
+          "port_id": 143,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "imap",
+            "product": "Dovecot",
+            "version": "2.3.20",
+            "confidence": 10
+          }
+        },
+        {
+          "port_id": 993,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "imaps",
+            "product": "Dovecot",
+            "version": "2.3.20",
+            "confidence": 10
+          }
+        },
+        {
+          "port_id": 587,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "submission",
+            "product": "Postfix",
+            "version": "3.7.4",
+            "confidence": 10
+          }
+        }
+      ]
+    },
+    {
+      "ip": "10.0.0.25",
+      "hostnames": ["monitoring.corp.local"],
+      "status": "up",
+      "os_matches": ["CentOS 9"],
+      "ports": [
+        {
+          "port_id": 9200,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "elasticsearch",
+            "product": "Elasticsearch",
+            "version": "8.11.1",
+            "confidence": 10
+          }
+        },
+        {
+          "port_id": 5601,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "http",
+            "product": "Kibana",
+            "version": "8.11.1",
+            "confidence": 8
+          }
+        },
+        {
+          "port_id": 9090,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "http",
+            "product": "Prometheus",
+            "version": "2.48",
+            "confidence": 7
+          }
+        },
+        {
+          "port_id": 3000,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "http",
+            "product": "Grafana",
+            "version": "10.2.0",
+            "confidence": 9
+          }
+        }
+      ]
+    },
+    {
+      "ip": "10.0.0.50",
+      "hostnames": [],
+      "status": "up",
+      "os_matches": [],
+      "ports": [
+        {
+          "port_id": 21,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "ftp",
+            "product": "vsftpd",
+            "version": "3.0.5",
+            "confidence": 10
+          }
+        },
+        {
+          "port_id": 23,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "telnet",
+            "product": "",
+            "version": "",
+            "confidence": 8
+          }
+        },
+        {
+          "port_id": 80,
+          "protocol": "tcp",
+          "state": "open",
+          "reason": "syn-ack",
+          "service": {
+            "name": "http",
+            "product": "lighttpd",
+            "version": "1.4.71",
+            "confidence": 10
+          }
+        },
+        {
+          "port_id": 8443,
+          "protocol": "tcp",
+          "state": "filtered",
+          "reason": "no-response",
+          "service": {
+            "name": "https-alt",
+            "product": "",
+            "version": "",
+            "confidence": 3
+          }
+        }
+      ]
+    }
+  ]
+}

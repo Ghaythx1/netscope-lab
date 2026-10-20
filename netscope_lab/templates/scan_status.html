@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab — Scan Status{% endblock %}
+{% block page_title %}Scan Status{% endblock %}
+
+{% block content %}
+<style>
+/* ---- Scan Status Page ---- */
+.status-container {
+    max-width: 680px;
+    margin: 40px auto;
+}
+
+.status-hero {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 48px 40px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+.status-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.08) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+/* Spinner Ring */
+.spinner-ring {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    border: 4px solid var(--border);
+    border-top-color: var(--accent-primary);
+    border-right-color: var(--accent-secondary);
+    animation: spin-ring 1.0s linear infinite;
+    margin: 0 auto 28px;
+    position: relative;
+}
+.spinner-ring::after {
+    content: '🎯';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.6rem;
+    animation: counter-spin 1.0s linear infinite;
+}
+@keyframes spin-ring { to { transform: rotate(360deg); } }
+@keyframes counter-spin { to { transform: translate(-50%,-50%) rotate(-360deg); } }
+
+.spinner-done {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    background: rgba(34,197,94,0.15);
+    border: 3px solid rgba(34,197,94,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem;
+    margin: 0 auto 28px;
+    animation: pop-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+.spinner-error {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    background: rgba(239,68,68,0.12);
+    border: 3px solid rgba(239,68,68,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem;
+    margin: 0 auto 28px;
+    animation: pop-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+.spinner-cancelled {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    background: rgba(245,158,11,0.12);
+    border: 3px solid rgba(245,158,11,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem;
+    margin: 0 auto 28px;
+}
+@keyframes pop-in { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.status-target {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--accent-primary);
+    background: rgba(56,189,248,0.08);
+    border: 1px solid rgba(56,189,248,0.2);
+    border-radius: var(--radius-sm);
+    padding: 5px 14px;
+    display: inline-block;
+    margin-bottom: 12px;
+}
+.status-scan-type {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    font-family: var(--font-mono);
+}
+
+.status-message {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    min-height: 32px;
+    transition: all 0.3s ease;
+    margin-bottom: 24px;
+}
+
+/* Animated progress bar */
+.progress-track {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-surface);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 32px;
+}
+.progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    animation: indeterminate 2s ease infinite;
+    transform-origin: left;
+}
+.progress-fill.determinate { animation: none; transition: width 0.6s ease; }
+.progress-meta { display:flex; justify-content:space-between; gap:12px; margin-top:-24px; margin-bottom:28px; color:var(--text-muted); font-size:.8rem; font-family:var(--font-mono); }
+@keyframes indeterminate {
+    0%   { transform: translateX(-100%) scaleX(0.5); }
+    100% { transform: translateX(200%) scaleX(0.5); }
+}
+.progress-fill.done   { animation: none; width: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); }
+.progress-fill.error  { animation: none; width: 100%; background: #ef4444; }
+.progress-fill.cancel { animation: none; width: 60%;  background: #f59e0b; }
+
+/* Results card (shown when done) */
+.results-card {
+    display: none;
+    background: rgba(34,197,94,0.06);
+    border: 1px solid rgba(34,197,94,0.25);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    text-align: left;
+    margin-bottom: 24px;
+}
+.results-card.visible { display: block; animation: pop-in 0.4s ease; }
+.results-stats {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.res-stat { text-align: center; }
+.res-val {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    line-height: 1.1;
+    font-family: var(--font-mono);
+}
+.res-lbl {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Error card */
+.error-card {
+    display: none;
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+    text-align: left;
+    margin-bottom: 24px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: #fca5a5;
+    line-height: 1.5;
+    word-break: break-word;
+}
+.error-card.visible { display: block; animation: pop-in 0.4s ease; }
+
+/* Action buttons */
+.status-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.btn-cancel {
+    padding: 10px 24px;
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.35);
+    color: #f87171;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: var(--transition);
+    cursor: pointer;
+}
+.btn-cancel:hover { background: rgba(239,68,68,0.2); color: #fca5a5; }
+
+.btn-dash {
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    color: #fff;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: var(--transition);
+    display: none;
+    align-items: center;
+    gap: 8px;
+}
+.btn-dash.visible { display: inline-flex; animation: pop-in 0.5s ease; }
+.btn-dash:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,189,248,0.3); color: #fff; }
+
+.btn-rescan {
+    padding: 10px 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: var(--transition);
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+.btn-rescan.visible { display: inline-flex; animation: pop-in 0.5s ease; }
+.btn-rescan:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+
+/* Dots indicator */
+.scanning-dots::after {
+    content: '';
+    display: inline-block;
+    animation: dots 1.5s steps(4, end) infinite;
+}
+@keyframes dots {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+    100% { content: ''; }
+}
+
+/* Countdown */
+.countdown-bar {
+    display: none;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: -16px;
+    margin-bottom: 20px;
+}
+.countdown-bar.visible { display: block; }
+</style>
+
+<div class="status-container">
+    <div class="status-hero">
+
+        <!-- Spinner / Done Icon -->
+        <div id="spinner-area">
+            <div class="spinner-ring" id="spinner-ring"></div>
+        </div>
+
+        <!-- Target + type info -->
+        <div class="status-target" id="status-target">
+            {{ runner.target or 'Preparing...' }}
+        </div>
+        <div class="status-scan-type" id="status-scan-type">
+            {% if runner.scan_type %}
+            {{ runner.scan_type }} scan
+            {% else %}
+            —
+            {% endif %}
+        </div>
+
+        <!-- Status message -->
+        <div class="status-message" id="status-message">
+            <span class="scanning-dots">{{ runner.message or 'Initializing' }}</span>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-meta">
+            <span id="progress-label">Waiting for Nmap progress…</span>
+            <span id="eta-label">Approximate time remaining: estimating</span>
+        </div>
+
+        <!-- Results (shown on success) -->
+        <div class="results-card" id="results-card">
+            <div class="results-stats" id="results-stats"></div>
+        </div>
+
+        <!-- Error detail -->
+        <div class="error-card" id="error-card"></div>
+
+        <!-- Countdown to redirect -->
+        <div class="countdown-bar" id="countdown-bar"></div>
+
+        <!-- Action buttons -->
+        <div class="status-actions">
+            <a href="{{ url_for('scan_cancel') }}" class="btn-cancel" id="btn-cancel">✕ Cancel Scan</a>
+            <a href="{{ url_for('dashboard') }}" class="btn-dash" id="btn-dash">📊 View Dashboard</a>
+            <a href="{{ url_for('live_scan') }}" class="btn-rescan" id="btn-rescan">🔄 New Scan</a>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+
+let pollTimer = null;
+let countdownTimer = null;
+
+// Scan type pretty names
+const scanTypeNames = {
+    ping: 'Ping Sweep', quick: 'Quick Scan', syn: 'SYN Stealth Scan',
+    service: 'Service Detection', full: 'Full Scan', aggressive: 'Aggressive Scan',
+    vuln: 'Vulnerability Scripts', udp: 'UDP Scan', tcp_connect: 'TCP Connect', all_tcp: 'All TCP Ports', tcp_udp: 'TCP + UDP'
+};
+
+function showSpinner(type) {
+    const area = $('spinner-area');
+    if (type === 'running') {
+        area.innerHTML = '<div class="spinner-ring"></div>';
+    } else if (type === 'done') {
+        area.innerHTML = '<div class="spinner-done">✅</div>';
+    } else if (type === 'error') {
+        area.innerHTML = '<div class="spinner-error">❌</div>';
+    } else if (type === 'cancelled') {
+        area.innerHTML = '<div class="spinner-cancelled">⚠️</div>';
+    }
+}
+
+function startCountdown(seconds) {
+    const bar = $('countdown-bar');
+    bar.classList.add('visible');
+    let remaining = seconds;
+    bar.textContent = `Redirecting to Dashboard in ${remaining}s...`;
+    countdownTimer = setInterval(() => {
+        remaining--;
+        bar.textContent = `Redirecting to Dashboard in ${remaining}s...`;
+        if (remaining <= 0) {
+            clearInterval(countdownTimer);
+            window.location.href = '/';
+        }
+    }, 1000);
+}
+
+function updateUI(data) {
+    // Target + scan type
+    if (data.target) $('status-target').textContent = data.target;
+    if (data.scan_type) {
+        const name = data.scan_type_name || scanTypeNames[data.scan_type] || data.scan_type;
+        $('status-scan-type').textContent = name;
+    }
+
+    // Message
+    const msgEl = $('status-message');
+    if (data.running) {
+        msgEl.textContent = data.message || 'Scanning';
+    } else {
+        msgEl.textContent = data.message || '';
+    }
+    const pct = Math.max(0, Math.min(100, Number(data.progress_percent) || 0));
+    const fill = $('progress-fill');
+    fill.classList.add('determinate');
+    fill.style.width = pct + '%';
+    fill.parentElement.setAttribute('role', 'progressbar');
+    fill.parentElement.setAttribute('aria-valuemin', '0');
+    fill.parentElement.setAttribute('aria-valuemax', '100');
+    fill.parentElement.setAttribute('aria-valuenow', String(Math.round(pct)));
+    const progressKind = data.progress_source === 'estimate' ? 'estimated' : 'Nmap';
+    $('progress-label').textContent = data.phase ? `${data.phase} · ${Math.round(pct)}% · ${progressKind}` : `${Math.round(pct)}% · ${progressKind}`;
+    if (data.cancelled) {
+        $('eta-label').textContent = 'Scan cancelled';
+    } else if (data.error) {
+        $('eta-label').textContent = 'Scan stopped';
+    } else if (data.eta_seconds === 0 || data.done) {
+        $('eta-label').textContent = 'Complete';
+    } else if (Number.isFinite(data.eta_seconds) && data.eta_seconds > 0) {
+        const minutes = Math.floor(data.eta_seconds / 60);
+        const seconds = data.eta_seconds % 60;
+        $('eta-label').textContent = `Approx. ${minutes ? minutes + 'm ' : ''}${seconds}s remaining`;
+    } else {
+        $('eta-label').textContent = 'Approximate time remaining: estimating…';
+    }
+
+    if (data.done) {
+        clearInterval(pollTimer);
+
+        if (data.cancelled) {
+            showSpinner('cancelled');
+            $('progress-fill').classList.add('cancel');
+            $('btn-cancel').style.display = 'none';
+            $('btn-rescan').classList.add('visible');
+
+        } else if (data.error) {
+            showSpinner('error');
+            $('progress-fill').classList.add('error');
+            $('error-card').textContent = data.error;
+            $('error-card').classList.add('visible');
+            $('btn-cancel').style.display = 'none';
+            $('btn-rescan').classList.add('visible');
+
+        } else {
+            // Success!
+            showSpinner('done');
+            $('progress-fill').classList.add('done');
+            $('btn-cancel').style.display = 'none';
+            $('btn-dash').classList.add('visible');
+            $('btn-rescan').classList.add('visible');
+
+            // Show results
+            const card = $('results-card');
+            card.classList.add('visible');
+            $('results-stats').innerHTML =
+                `<div class="res-stat"><div class="res-val">${data.host_count}</div><div class="res-lbl">Hosts Found</div></div>` +
+                `<div class="res-stat"><div class="res-val">${data.hosts_up}</div><div class="res-lbl">Hosts Up</div></div>` +
+                `<div class="res-stat"><div class="res-val">${data.open_ports}</div><div class="res-lbl">Open Ports</div></div>` +
+                `<a href="/hosts" class="btn btn-primary btn-sm">View hosts, MAC addresses &amp; manufacturers</a>`;
+
+            startCountdown(5);
+        }
+    }
+}
+
+async function poll() {
+    try {
+        const r = await fetch('/api/scan/status');
+        if (!r.ok) return;
+        const data = await r.json();
+        updateUI(data);
+    } catch (e) {
+        console.warn('Poll error:', e);
+    }
+}
+
+// Start polling
+pollTimer = setInterval(poll, 1500);
+poll(); // immediate first call
+</script>
+{% endblock %}
+{% endblock %}

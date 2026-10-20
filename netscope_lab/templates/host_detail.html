@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}NetScope Lab — {{ host.display_name if host else host_ip }}{% endblock %}
+{% block page_title %}Host Detail{% endblock %}
+
+{% block content %}
+{% if host %}
+<div class="breadcrumb">
+    <a href="{{ url_for('hosts') }}">Hosts</a> <span class="breadcrumb-sep">›</span> {{ host.ip_address }}
+</div>
+
+<div class="host-header-card">
+    <div class="host-header-info">
+        <h2 class="host-title">
+            <span class="status-dot status-{{ host.status }}"></span>
+            {{ host.display_name }}
+        </h2>
+        <div class="host-meta-tags">
+            <span class="meta-tag">Status: {{ host.status }}</span>
+            {% if host.mac_address %}
+            <span class="meta-tag">MAC: {{ host.mac_address }}</span>
+            {% else %}
+            <span class="meta-tag">MAC: unavailable</span>
+            {% endif %}
+            {% if host.vendor %}
+            <span class="meta-tag">Vendor: {{ host.vendor }}</span>
+            {% else %}
+            <span class="meta-tag">Manufacturer: Unknown</span>
+            {% endif %}
+            {% for os in host.os_matches %}
+            <span class="meta-tag meta-tag-os">{{ os }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="host-header-stats">
+        <div class="mini-stat">
+            <span class="mini-stat-value">{{ host.open_ports|length }}</span>
+            <span class="mini-stat-label">Open</span>
+        </div>
+        <div class="mini-stat">
+            <span class="mini-stat-value">{{ host.closed_ports|length }}</span>
+            <span class="mini-stat-label">Closed</span>
+        </div>
+        <div class="mini-stat">
+            <span class="mini-stat-value">{{ host.filtered_ports|length }}</span>
+            <span class="mini-stat-label">Filtered</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h3 class="section-title">Ports & Services ({{ host.ports|length }})</h3>
+    {% if host.ports %}
+    <div class="table-container">
+        <table class="data-table" id="ports-table">
+            <thead>
+                <tr>
+                    <th>Port</th>
+                    <th>Protocol</th>
+                    <th>State</th>
+                    <th>Service</th>
+                    <th>Product</th>
+                    <th>Version</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for port in host.ports %}
+                <tr class="port-row port-{{ port.state.value | replace('|', '-') }}">
+                    <td class="port-number">{{ port.port_id }}</td>
+                    <td>{{ port.protocol }}</td>
+                    <td>
+                        <span class="state-badge state-{{ port.state.value | replace('|', '-') }}">
+                            {{ port.state.value }}
+                        </span>
+                    </td>
+                    <td>{{ port.service.name }}</td>
+                    <td>{{ port.service.product or '—' }}</td>
+                    <td>{{ port.service.version or '—' }}</td>
+                    <td class="reason-cell">{{ port.reason or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-text">No ports scanned for this host.</p>
+    {% endif %}
+</div>
+
+{% if findings %}
+<div class="section">
+    <h3 class="section-title">Findings for this Host ({{ findings|length }})</h3>
+    {% for finding in findings %}
+    <div class="finding-card finding-{{ finding.severity }}" id="host-finding-{{ loop.index }}">
+        <div class="finding-header">
+            <span class="severity-badge severity-{{ finding.severity }}">{{ finding.severity|upper }}</span>
+            <span class="finding-name">{{ finding.rule_name }}</span>
+            <span class="finding-rule-id">{{ finding.rule_id }}</span>
+        </div>
+        <p class="finding-description">{{ finding.description }}</p>
+        <div class="finding-details">
+            <div class="finding-detail">
+                <strong>Evidence:</strong> {{ finding.evidence }}
+            </div>
+            <div class="finding-detail finding-limitation">
+                <strong>⚠ Limitation:</strong> {{ finding.limitation }}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">❓</div>
+    <h2>Host Not Found</h2>
+    <p>No host with IP address <strong>{{ host_ip }}</strong> was found in the current scan data.</p>
+    <a href="{{ url_for('hosts') }}" class="btn btn-primary">Back to Hosts</a>
+</div>
+{% endif %}
+{% endblock %}
